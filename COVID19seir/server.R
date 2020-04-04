@@ -1,508 +1,646 @@
 library(deSolve)
 library(reshape)
-library(googlesheets4)
-sheets_deauth()
+library(plotly)
+library(dplyr)
+library(htmltools)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(shinydashboard)
 source("code/functions.R")
+source("code/functions_age.R")
 
-# ----------------------------------------------------------------------------
-# Load data:
-# --------------------
+ageBounds = c(
+  "< 4" = 3, 
+  "4 - 7" = 7, 
+  "8 - 12" = 12,
+  "13 - 18" = 18, 
+  "19 - 25" = 25, 
+  "26 - 35" = 35, 
+  "36 - 50" = 50, 
+  "51 - 65" = 65, 
+  "66 - 75" = 75, 
+  "76 - 85" = 85, 
+  "> 85" = 100
+)
 
-HospDataAll=read_sheet("https://docs.google.com/spreadsheets/d/1zZKKnZ47lqfmUGYDQuWNnzKnh-IDMy15LBaRmrBcjqE/edit#gid=1585003222",sheet="Hospital capacity")
-HospDataAll=na.omit(HospDataAll)
-hdata = as.data.frame(t(data.frame(HospDataAll[,c("Name","Value")], row.names="Name")))
+ageContactRates <- getMossongData(
+  ensureSym = T,
+  ageBounds = as.numeric(ageBounds)
+) %>%
+  mutate(
+    age_both = map2_chr(
+      age_1, age_2, 
+      function(a1, a2) paste(sort(c(a1, a2)), collapse = "_")
+    )
+  )
+
+ageContactRatesPairs <- ageContactRates %>%
+  distinct(age_both, .keep_all = T)
 
 
 function(input, output, session) {
+
+  ageContacts <- map(seq_len(nrow(ageContactRatesPairs)/3), function(i) {
+    fluidRow(
+      column(
+        4, 
+        numericInput(
+          paste0("A",ageContactRatesPairs$age_both[(i-1)*3+1]),
+          paste0(
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_1[(i-1)*3+1]],
+            " and ",
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_2[(i-1)*3+1]]
+          ),
+          value = round(ageContactRatesPairs$daily_contacts[(i-1)*3+1], 2),
+          min = 0, max = 50, step = 0.01
+        )
+      ),
+      column(
+        4,
+        numericInput(
+          paste0("A",ageContactRatesPairs$age_both[(i-1)*3+2]),
+          paste0(
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_1[(i-1)*3+2]],
+            " and ",
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_2[(i-1)*3+2]]
+          ),
+          value = round(ageContactRatesPairs$daily_contacts[(i-1)*3+1], 2),
+          min = 0, max = 50, step = 0.01
+        )
+      ),
+      column(
+        4,
+        numericInput(
+          paste0("A",ageContactRatesPairs$age_both[(i-1)*3+3]),
+          paste0(
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_1[(i-1)*3+3]],
+            " and ",
+            names(ageBounds)[ageBounds == ageContactRatesPairs$age_2[(i-1)*3+3]]
+          ),
+          value = round(ageContactRatesPairs$daily_contacts[(i-1)*3+3], 2),
+          min = 0, max = 50, step = 0.01
+        )
+      )
+    )
+  })
+  
+  output$ageContacts <- renderUI({ageContacts})
+  
+  contactMatrix <- reactive({
+    ageContactRates %>%
+      mutate(daily_contacts = map_dbl(age_both, function(ageKey) {
+        res <- input[[paste0("A",ageKey)]]
+        if (!length(res)) {
+          return(
+            ageContactRatesPairs$daily_contacts[ageContactRatesPairs$age_both == ageKey]
+          )
+        } 
+      })) %>%
+      select(-age_both) %>%
+      tidyr::spread(age_2, daily_contacts) %>%
+      select(-age_1) %>%
+      as.matrix()
+  })
   
   # Plot timecourse of all variables
-  
-  output$plot0 = renderPlotly({
-   
-    sim=SimSEIR(input)
-    
-    out.df=sim$out.df
-    N=sim$N
-    Ro=sim$Ro
-    r=sim$r
-    DoublingTime=sim$DoublingTime
-    
-    #combine exposed classes for plotting
-    out.df$E0=out.df$E0+out.df$E1
-    out.df$E1=NULL
-    out.df=rename(out.df, c(E0="E"))
-    
-    #reformat data for plotting
-    out.df2=rename(out.df, c(S="Susceptible", E="Exposed", I0="Infected.NoSymptoms", I1="Infected.Mild", I2="Infected.Severe", I3="Infected.Critical", R="Recovered", D="Dead"))
-    out=melt(out.df,id="time")
-    out2=melt(out.df2,id="time")
-    out$variableName=out2$variable
-    out$variableLegend = paste0(out$variableName,' (',out$variable,')')
-    out$variableLegend = factor(out$variableLegend, levels = unique(out[["variableLegend"]]))
-    
-    #create data for plotting total infected
-    Comb.df=out.df
-    Comb.df$I0=rowSums(out.df[,c("I0","I1","I2","I3")]) # create total infected
-    Comb.df=rename(Comb.df, c(I0="I"))
-    Comb.df$I1=NULL
-    Comb.df$I2=NULL
-    Comb.df$I3=NULL
-    
-    Comb.df2=rename(Comb.df, c(S="Susceptible", E="Exposed", I="Infected", R="Recovered", D="Dead"))
-    Comb=melt(Comb.df,id="time")
-    Comb2=melt(Comb.df2,id="time")
-    Comb$variableName=Comb2$variable
-    Comb$variableLegend = paste0(Comb$variableName,' (',Comb$variable,')')
-    Comb$variableLegend = factor(Comb$variableLegend, levels = unique(Comb[["variableLegend"]]))
-    
-    
-    #plot
-    
-    if(input$PlotCombine=="Yes"){
-      p=plot_ly(data = Comb, x=~time, y=~value, color=~variableLegend, type='scatter', mode='lines')
-    }else{
-      if(input$AllowAsym=="Yes"){
-        p=plot_ly(data = out, x=~time, y=~value, color=~variableLegend, type='scatter', mode='lines')
-      }else{
-        #don't want to show the I0 class in the plot
-        outSym=out[out$variable!="I0",]
-        p=plot_ly(data = outSym, x=~time, y=~value, color=~variableLegend, type='scatter', mode='lines')
-      }
-    }
-    
-    p=layout(p,xaxis=list(title="Time since introduction (days)"),yaxis=list(title=paste("Number per",formatC(N,big.mark=",",format="f",digits=0),"people"),type=input$yscale),
-             annotations=list(text=HTML(paste("R", tags$sub(0),'=',formatC(Ro,digits=2)," <br>r =", formatC(r,digits=2)," per day <br>T",tags$sub(2)," = ",formatC(DoublingTime,digits=2)," days")),
-                              showarrow=FALSE,xref="paper",xanchor="left",x=1.05, yref="paper", yanchor="center",y=0.35, align="left"))
-    
-    if(input$AllowSeason=="Yes"){
+  resultBase <- reactive({
+    simInterventionsAge(
+      interventions = tibble(),
+      IncubPeriod = input$IncubPeriod,
+      DurMildInf = input$DurMildInf, 
+      FracSevere = c(
+        input$FracSevere1,
+        input$FracSevere2,
+        input$FracSevere3,
+        input$FracSevere4,
+        input$FracSevere5,
+        input$FracSevere6,
+        input$FracSevere7,
+        input$FracSevere8,
+        input$FracSevere9,
+        input$FracSevere10,
+        input$FracSevere11
+      ),
+      FracCritical = c(
+        input$FracCritical1,
+        input$FracCritical2,
+        input$FracCritical3,
+        input$FracCritical4,
+        input$FracCritical5,
+        input$FracCritical6,
+        input$FracCritical7,
+        input$FracCritical8,
+        input$FracCritical9,
+        input$FracCritical10,
+        input$FracCritical11
+      ),
+      ProbDeath = c(
+        input$ProbDeath1,
+        input$ProbDeath2,
+        input$ProbDeath3,
+        input$ProbDeath4,
+        input$ProbDeath5,
+        input$ProbDeath6,
+        input$ProbDeath7,
+        input$ProbDeath8,
+        input$ProbDeath9,
+        input$ProbDeath10,
+        input$ProbDeath11
+      ),
+      DurHosp = input$DurHosp,
+      TimeICUDeath = input$TimeICUDeath,
+      AllowPresym = input$AllowPresym,
+      AllowAsym = input$AllowAsym,
+      FracAsym = input$FracAsym,
+      PresymPeriod = input$PresymPeriod, #Length of infectious phase of incubation period
+      DurAsym = input$DurAsym,
       
-      Ro.Season=sim$Ro.Season
-      tpeak=365+input$seas.phase
-      tmin=180+input$seas.phase
-      #print(Ro.Season)
-      #print(Ro.Season$Ro.now)
-      p=layout(p,annotations=list(text=HTML(paste("Seasonal R", tags$sub(0), ": <br>Initial R", tags$sub(0),'=',formatC(Ro.Season$Ro.now,digits=2),"<br>Peak R", tags$sub(0),'=',formatC(Ro.Season$Ro.max,digits=2),"@day",formatC(tpeak,format = "f",digits=0),"<br>Min R", tags$sub(0),'=',formatC(Ro.Season$Ro.min,digits=2),"@day",formatC(tmin,format = "f",digits=0))),
-                                  showarrow=FALSE,xref="paper",xanchor="left",x=1.05, yref="paper", yanchor="center",y=0.05, align="left"))
+      b1 = input$b1,
+      b2 = input$b2,
+      b3 = input$b3,
+      be = input$be,
+      b0 = input$b0,
+      Tmax = input$Tmax, 
+      InitInf= input$InitInf,
       
-    }
-    p
-
-  })
-  
-  #Plot timecourse with an intervention
-  
-  output$plotInt = renderPlotly({
-    
-    sim=SimSEIR(input)
-    
-    out.df=sim$out.df
-    N=sim$N
-    Ro=sim$Ro
-    r=sim$r
-    DoublingTime=sim$DoublingTime
-    
-    #combine exposed classes for plotting
-    out.df$E0=out.df$E0+out.df$E1
-    out.df$E1=NULL
-    out.df=rename(out.df, c(E0="E"))
-    
-    simInt=SimSEIRintB(input)
-    
-    outInt.df=simInt$out.df
-    RoInt=simInt$Ro
-    rInt=simInt$r
-    DoublingTimeInt=simInt$DoublingTime
-    
-    #combine exposed classes for plotting
-    outInt.df$E0=outInt.df$E0+outInt.df$E1
-    outInt.df$E1=NULL
-    outInt.df=rename(outInt.df, c(E0="E"))
-    
-    if(input$VarShowInt=="Inf"){
+      AllowSeason = input$AllowSeason,
+      seas.amp = input$seas.amp,
+      seas.phase = input$seas.phase,
       
-      out.df$value=rowSums(out.df[,c("E","I0","I1","I2","I3")]) # create observed variable
-      outInt.df$value=rowSums(outInt.df[,c("E","I0","I1","I2","I3")])
+      NaturalDeathRate = input$NaturalDeath,
+      InoculationSchedule = 0,
+      ReinfectionChance = input$LoseImunity,
       
-    }else if(input$VarShowInt=="Cases"){
-      out.df$value=rowSums(out.df[,c("I1","I2","I3")]) # create observed variable
-      outInt.df$value=rowSums(outInt.df[,c("I1","I2","I3")])
-      
-    }else if(input$VarShowInt=="Hosp"){
-      out.df$value=rowSums(out.df[,c("I2","I3")]) # create observed variable
-      outInt.df$value=rowSums(outInt.df[,c("I2","I3")])
-
-    }else{
-
-      out.df$value=out.df[,input$VarShowInt] # create observed variable
-      outInt.df$value=outInt.df[,input$VarShowInt]
-      
-    }
-    out.df$Intervention="Baseline" # add intervention column
-    outInt.df$Intervention="Intervention"
-    outAll.df=rbind(out.df,outInt.df) #combine baseline and intervention
-    outAll.sub=subset(outAll.df, select=c("time","value","Intervention")) # choose only case column
-    outAll.sub$Intervention=factor(outAll.sub$Intervention) # set intervention as factor
-    outAll.sub=outAll.sub[with(outAll.sub,order(Intervention,time)),]
-    
-    
-    p=plot_ly(data = outAll.sub, x=~time, y=~value, color=~Intervention, type='scatter', mode='lines',colors=c("#a50f15","#fc9272"))
-    
-    p=layout(p,xaxis=list(title="Time since introduction (days)"),yaxis=list(title=paste("Number per", formatC(N,big.mark=",",format="f",digits=0),"people"),type=input$yscaleInt),
-             annotations=list(text=HTML(paste("Baseline: <br>R", tags$sub(0),'=',format(Ro,nsmall=1)," <br>r =", format(r,digits=2)," per day <br>T",tags$sub(2)," = ",format(DoublingTime,digits=1)," days <br><br>Intervention: <br>R", tags$sub(0),'=',RoInt,"<br>r =", format(rInt,digits=2)," per day <br>T",tags$sub(2)," = ",format(DoublingTimeInt,digits=1)," days")),
-                              showarrow=FALSE,xref="paper",xanchor="left",x=1.05, yref="paper", yanchor="top",y=0.8, align="left")
-             )
-    
-    if(input$AllowSeason=="Yes"){
-      
-      Ro.Season=sim$Ro.Season
-      RoInt.Season=simInt$Ro.Season
-      tpeak=365+input$seas.phase
-      tmin=180+input$seas.phase
-      
-      p=layout(p,annotations=list(text=HTML(paste0("Seasonal R", tags$sub(0), ": <br>Initial R", tags$sub(0),'=',formatC(Ro.Season$Ro.now,digits=2),"/",formatC(RoInt.Season$Ro.now,digits=2),"<br>Peak R", tags$sub(0),'=',formatC(Ro.Season$Ro.max,digits=2),"/",formatC(RoInt.Season$Ro.max,digits=2),"<br>  @day ",formatC(tpeak,format = "f",digits=0),"<br>Min R", tags$sub(0),'=',formatC(Ro.Season$Ro.min,digits=2),"/",formatC(RoInt.Season$Ro.min,digits=2),"<br>  @day ",formatC(tmin,format = "f",digits=0))),
-                                  showarrow=FALSE,xref="paper",xanchor="left",x=1.05, yref="paper", yanchor="center",y=0, align="left"))
-      
-    }
-    
-    p
-    
-  })
-  
-  output$plotCap = renderPlotly({
-    
-    sim=SimSEIR(input)
-    
-    out.df=sim$out.df
-    N=sim$N
-    Ro=sim$Ro
-    r=sim$r
-    DoublingTime=sim$DoublingTime
-    
-    #combine exposed classes for plotting
-    out.df$E0=out.df$E0+out.df$E1
-    out.df$E1=NULL
-    out.df=rename(out.df, c(E0="E"))
-    
-    simInt=SimSEIRintB(input)
-    
-    outInt.df=simInt$out.df
-    RoInt=simInt$Ro
-    rInt=simInt$r
-    DoublingTimeInt=simInt$DoublingTime
-    
-    #combine exposed classes for plotting
-    outInt.df$E0=outInt.df$E0+outInt.df$E1
-    outInt.df$E1=NULL
-    outInt.df=rename(outInt.df, c(E0="E"))
-    
-    Tmax=input$Tmax
-    
-    #subset the relevant variables and add in a column for capacity
-    capParams=SetHospCapacity(input)
-
-    if(input$VarShowCap=="I3mv"){
-      
-      out.df$value=out.df[,"I3"] # create observed variable
-      outInt.df$value=outInt.df[,"I3"]
-      out.df$Intervention="Baseline" # add intervention column
-      outInt.df$Intervention="Intervention"
-      outAll.df=rbind(out.df,outInt.df) #combine baseline and intervention
-      outAll.sub=subset(outAll.df, select=c("time","value","Intervention")) # choose only case column
-      outAll.sub$Intervention=factor(outAll.sub$Intervention) # set intervention as factor
-      outAll.sub=outAll.sub[with(outAll.sub,order(Intervention,time)),]
-      
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["ConvVentCap"]*(N/1000), "Intervention"="Conventional Mechanical \n Ventilator Capacity")
-      combData=rbind(outAll.sub,capData)
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["ContVentCap"]*(N/1000), "Intervention"="Contingency Mechanical \n Ventilator Capacity")
-      combData=rbind(combData,capData)
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["CrisisVentCap"]*(N/1000), "Intervention"="Crisis Mechanical \n Ventilator Capacity")
-      combData=rbind(combData,capData)
-      
-      p=plot_ly(data = combData, x=~time, y=~value, color=~Intervention, linetype=~Intervention, type='scatter', mode='lines', colors=c("#a50f15","#fc9272","grey","grey","grey"), linetypes=c("solid","solid","dash","dashdot","dot"))
-      
-    }else if(input$VarShowCap=="I3bed"){
-      
-      out.df$value=out.df[,"I3"] # create observed variable
-      outInt.df$value=outInt.df[,"I3"]
-      out.df$Intervention="Baseline" # add intervention column
-      outInt.df$Intervention="Intervention"
-      outAll.df=rbind(out.df,outInt.df) #combine baseline and intervention
-      outAll.sub=subset(outAll.df, select=c("time","value","Intervention")) # choose only case column
-      outAll.sub$Intervention=factor(outAll.sub$Intervention) # set intervention as factor
-      outAll.sub=outAll.sub[with(outAll.sub,order(Intervention,time)),]
-      
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["AvailICUBeds"]*(N/1000), "Intervention"="Available ICU Beds")
-      combData=rbind(outAll.sub,capData)
-      
-      p=plot_ly(data = combData, x=~time, y=~value, color=~Intervention, linetype=~Intervention, type='scatter', mode='lines', colors=c("#a50f15","#fc9272","grey"), linetypes=c("solid","solid","dash"))
-      
-    }else if(input$VarShowCap=="Hosp"){
-      
-      out.df$value=rowSums(out.df[,c("I2","I3")]) # create observed variable
-      outInt.df$value=rowSums(outInt.df[,c("I2","I3")])
-      out.df$Intervention="Baseline" # add intervention column
-      outInt.df$Intervention="Intervention"
-      outAll.df=rbind(out.df,outInt.df) #combine baseline and intervention
-      outAll.sub=subset(outAll.df, select=c("time","value","Intervention")) # choose only case column
-      outAll.sub$Intervention=factor(outAll.sub$Intervention) # set intervention as factor
-      outAll.sub=outAll.sub[with(outAll.sub,order(Intervention,time)),]
-      
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["AvailHospBeds"]*(N/1000), "Intervention"="Available Hospital Beds")
-      combData=rbind(outAll.sub,capData)
-      
-      p=plot_ly(data = combData, x=~time, y=~value, color=~Intervention, linetype=~Intervention, type='scatter', mode='lines', colors=c("#a50f15","#fc9272","grey"), linetypes=c("solid","solid","dash"))
-      
-    }else{ #CasesCap
-      out.df$value=rowSums(out.df[,c("I1","I2","I3")]) # create observed variable
-      outInt.df$value=rowSums(outInt.df[,c("I1","I2","I3")])
-      out.df$Intervention="Baseline" # add intervention column
-      outInt.df$Intervention="Intervention"
-      outAll.df=rbind(out.df,outInt.df) #combine baseline and intervention
-      outAll.sub=subset(outAll.df, select=c("time","value","Intervention")) # choose only case column
-      outAll.sub$Intervention=factor(outAll.sub$Intervention) # set intervention as factor
-      outAll.sub=outAll.sub[with(outAll.sub,order(Intervention,time)),]
-      
-      capData=data.frame("time"=seq(0, Tmax, length.out = 1e3),"value"=rep(1,1e3)*capParams["AvailHospBeds"]*(N/1000), "Intervention"="Available Hospital Beds")
-      combData=rbind(outAll.sub,capData)
-      
-      p=plot_ly(data = combData, x=~time, y=~value, color=~Intervention, linetype=~Intervention, type='scatter', mode='lines', colors=c("#a50f15","#fc9272","grey"), linetypes=c("solid","solid","dash"))
-      
-    }
-    
-    
-    p=layout(p,xaxis=list(title="Time since introduction (days)"),yaxis=list(title=paste("Number per",formatC(N,big.mark=",",format="f",digits=0),"people"),type=input$yscaleCap), 
-             annotations=list(text=HTML(paste("Baseline: <br>R", tags$sub(0),'=',format(Ro,nsmall=1)," <br>r =", format(r,digits=2)," per day <br>T",tags$sub(2)," = ",format(DoublingTime,digits=1)," days <br><br>Intervention: <br>R", tags$sub(0),'=',RoInt,"<br>r =", format(rInt,digits=2)," per day <br>T",tags$sub(2)," = ",format(DoublingTimeInt,digits=1), " days")),
-                              showarrow=FALSE,xref="paper",xanchor="left",x=1.05, yref="paper", yanchor="top",y=0.5, align="left")
+      ageBounds = ageBounds,
+      N = c(
+        input$N1,
+        input$N2,
+        input$N3,
+        input$N4,
+        input$N5,
+        input$N6,
+        input$N7,
+        input$N8,
+        input$N9,
+        input$N10,
+        input$N11
+      ),
+      ExposedContacts = contactMatrix(),
+      AssymContacts = contactMatrix(),
+      MildContacts = input$SocConMild * contactMatrix(),
+      SevereContacts = input$SocConSevere * contactMatrix(),
+      CritContacts = input$SocConCritical * contactMatrix()
     )
-    
-    p
-    
   })
   
-  # Show the rate parameter values using an HTML table
-  output$ParameterTable <-renderTable(
-    formattedModelParameters(), hover = T,bordered = T,striped = F, digits=3
-  )
-  
-  
-  formattedModelParameters <- reactive({
+  resultInterventions <- reactive({
     
-    ParamStruct=GetModelParams(input)
-    pModel=ParamStruct$pModel
-    N=ParamStruct$N
-    pModel.df=data.frame(as.list(pModel))
-    pModel.df$N=N
-    
-    #If asymptomatic infection is allowed
-    if(input$AllowAsym=="Yes"){
-      pModel.df$b0=pModel.df$b0*N
-      names(pModel.df)[names(pModel.df)=="b0"] <- "b0*N"
-    }else{
-      pModel.df$b0=NULL
-      pModel.df$f=NULL
-      pModel.df$g0=NULL
+    if (length(interventionInfo$intrv)) {
+      interventions = interventionInfo$intrv %>%
+        map(~.$intervention) %>%
+        reduce(bind_rows)
+    } else {
+      interventions <- tibble()
     }
     
-    # If presymptomatic transmission is allowed
-    if(input$AllowPresym=="Yes"){
-      pModel.df$be=pModel.df$be*N
-      names(pModel.df)[names(pModel.df)=="be"] <- "be*N"
-    }else{
-      pModel.df$be=NULL
-      pModel.df$a1=NULL
-      names(pModel.df)[names(pModel.df)=="a0"] <- "a"
+    simInterventionsAge(
+      interventions = interventions,
+      IncubPeriod = input$IncubPeriod,
+      DurMildInf = input$DurMildInf, 
+      FracSevere = c(
+        input$FracSevere1,
+        input$FracSevere2,
+        input$FracSevere3,
+        input$FracSevere4,
+        input$FracSevere5,
+        input$FracSevere6,
+        input$FracSevere7,
+        input$FracSevere8,
+        input$FracSevere9,
+        input$FracSevere10,
+        input$FracSevere11
+      ),
+      FracCritical = c(
+        input$FracCritical1,
+        input$FracCritical2,
+        input$FracCritical3,
+        input$FracCritical4,
+        input$FracCritical5,
+        input$FracCritical6,
+        input$FracCritical7,
+        input$FracCritical8,
+        input$FracCritical9,
+        input$FracCritical10,
+        input$FracCritical11
+      ),
+      ProbDeath = c(
+        input$ProbDeath1,
+        input$ProbDeath2,
+        input$ProbDeath3,
+        input$ProbDeath4,
+        input$ProbDeath5,
+        input$ProbDeath6,
+        input$ProbDeath7,
+        input$ProbDeath8,
+        input$ProbDeath9,
+        input$ProbDeath10,
+        input$ProbDeath11
+      ),
+      DurHosp = input$DurHosp,
+      TimeICUDeath = input$TimeICUDeath,
+      AllowPresym = input$AllowPresym,
+      AllowAsym = input$AllowAsym,
+      FracAsym = input$FracAsym,
+      PresymPeriod = input$PresymPeriod, #Length of infectious phase of incubation period
+      DurAsym = input$DurAsym,
+      
+      b1 = input$b1,
+      b2 = input$b2,
+      b3 = input$b3,
+      be = input$be,
+      b0 = input$b0,
+      Tmax = input$Tmax, 
+      InitInf= input$InitInf,
+      
+      AllowSeason = input$AllowSeason,
+      seas.amp = input$seas.amp,
+      seas.phase = input$seas.phase,
+      
+      NaturalDeathRate = input$NaturalDeath,
+      InoculationSchedule = 0,
+      ReinfectionChance = input$LoseImunity,
+      
+      ageBounds = ageBounds,
+      N = c(
+        input$N1,
+        input$N2,
+        input$N3,
+        input$N4,
+        input$N5,
+        input$N6,
+        input$N7,
+        input$N8,
+        input$N9,
+        input$N10,
+        input$N11
+      ),
+      ExposedContacts = contactMatrix(),
+      AssymContacts = contactMatrix(),
+      MildContacts = input$SocConMild * contactMatrix(),
+      SevereContacts = input$SocConSevere * contactMatrix(),
+      CritContacts = input$SocConCritical * contactMatrix()
+    )
+  })
+  
+  output$plotBase <- renderPlotly({
+    plotSimAggregate(resultBase())
+  })
+  output$plotBaseInttab <- renderPlotly({
+    plotSimAggregate(resultBase())
+  })
+  output$plotIntInttab <- renderPlotly({
+    plotSimAggregate(resultInterventions())
+  })
+  
+  output$plotEandI <- renderPlotly({
+    plotSimEandI(resultBase())
+  })
+  output$plotEandIBaseInttab <- renderPlotly({
+    plotSimEandI(resultBase())
+  })
+  output$plotEandIIntInttab <- renderPlotly({
+    plotSimEandI(resultInterventions())
+  })
+  
+  output$plotAge <- renderPlotly({
+    plotSimByAge(
+      resultBase(), 
+      whichGroup = input$agePlotWhat, 
+      usePlotly = F, 
+      ageBounds = ageBounds
+    )
+  })
+  output$plotAgeBaseInttab <- renderPlotly({
+    plotSimByAge(
+      resultBase(), 
+      whichGroup = input$agePlotWhatInt, 
+      usePlotly = F, 
+      ageBounds = ageBounds
+    )
+  })
+  output$plotAgeIntInttab <- renderPlotly({
+    plotSimByAge(
+      resultInterventions(), 
+      whichGroup = input$agePlotWhatInt, 
+      usePlotly = F, 
+      ageBounds = ageBounds
+    )
+  })
+  
+  countIntrv   <- reactiveValues(n=0) # will hold a counter of number of blocks
+  interventionInfo   <- reactiveValues(intrv = list()) # will hold block info
+  selectedIntrv <- reactiveValues(which = 0) # will hold id of selected
+  
+  #increment counter on button click
+  observeEvent(input$addIntrv, {
+    if (input$newIntrv != "" & countIntrv$n < 24 &
+        !(input$newIntrv %in% sapply(interventionInfo$blks, function(b) b$name))) {
+      
+      countIntrv$n <- countIntrv$n + 1
+      
+      entry <- list(
+        name = input$newIntrv
+      )
+      
+      interventionInfo$intrv[[length(interventionInfo$intrv)+1]] <- entry
     }
     
-    pModel.df$b1=pModel.df$b1*N
-    pModel.df$b2=pModel.df$b3*N
-    pModel.df$b3=pModel.df$b3*N
+    #input$newBlk <- ""
     
-    names(pModel.df)[names(pModel.df)=="b1"] <- "b1*N"
-    names(pModel.df)[names(pModel.df)=="b2"] <- "b2*N"
-    names(pModel.df)[names(pModel.df)=="b3"] <- "b3*N"
+  })
+  
+  #dynamically add UI inputs based on button clicks
+  interventionHeaders <- reactive({
+    n <- countIntrv$n
+    if (n > 0){
+      lapply(seq_len(n), function(i) {
+        fluidRow(
+          column(
+            2, style = "margin-top: 20px;", #should be relative
+            actionButton(
+              inputId = paste0("remIntrv",i), 
+              label = "", 
+              icon = icon("times")
+            )     
+          ),
+          column(
+            10, style = "margin-top: 20px;",
+            actionButton(
+              inputId = paste0("selIntrv",i), 
+              label = interventionInfo$intrv[[i]]$name, 
+              width = '100%'
+            )
+          )
+        )
+      })
+    }
+  })
+  
+  output$interventionHeaders <- renderUI({interventionHeaders()})
+  
+  #dynamically change selected block box
+  interventionInputs <- reactive({
+    id <- selectedIntrv$which
+    if (id != 0){
+      shinydashboard::box(
+        title = interventionInfo$intrv[[id]]$name,
+        width = 12, collapsible = F, collapsed = F,
+        column(
+          6,
+          selectInput(
+            "inttype",
+            "Intervention Type",
+            choices = c(
+              "Restrict All Contacts For All Ages" = "allContacts", 
+              "Restrict All Contacts For Specific Age Brackets" = "allForAge",
+              "Restrict Contacts Between Two Age Brackets" = "ageForAge",
+              "Decrease Probability of infection regardless of contact frequency" = "coef"
+            ), 
+            selected = interventionInfo$intrv[[id]]$inttype
+          ),
+          numericInput(
+            "intstart", 
+            "Intervention starts on day", 
+            value = interventionInfo$intrv[[id]]$intstart, 
+            min = 0, max = 3000
+          ),
+          numericInput(
+            "intend", 
+            "Intervention ends on day", 
+            value = interventionInfo$intrv[[id]]$intend,
+            min = 0, max = 3000
+          )
+        ),
+        column(
+          6,
+          conditionalPanel(
+            condition="input.inttype == 'coef'",
+            selectInput(
+              "intWhichCoef",
+              "Select Coefficient to intervene on",
+              choices = c("be", "b0", "b1", "b2", "mu"),
+              selected = interventionInfo$intrv[[id]]$intWhichCoef
+            ),
+            sliderInput(
+              "intCoefMagnitude",
+              "Decrease coefficient by %", 
+              value = interventionInfo$intrv[[id]]$intCoefMagnitude,
+              min = 0, max = 1, step = 0.01
+            )
+          ),
+          conditionalPanel(
+            condition="input.inttype == 'allContacts'",
+            selectInput(
+              "intAgeAllTarget",
+              "Decrease all social contacts for group:",
+              choices = c(
+                "Exposed" = "We",
+                "Asymptomatic Infections" = "W0",
+                "Mild Infections" = "W1",
+                "Severe Infections" = "W2",
+                "Critical Infections" = "W3"
+              ),
+              selected = interventionInfo$intrv[[id]]$intAgeAllTarget
+            ),
+            sliderInput(
+              "intAgeAllMagnitude",
+              "Decrease all social contacts by %",  
+              value = interventionInfo$intrv[[id]]$intAgeAllMagnitude,
+              min = 0, max = 1, step = 0.01
+            )
+          ),
+          conditionalPanel(
+            condition="input.inttype == 'ageForAge'",
+            selectInput(
+              "intAgeForAgeTarget",
+              "Decrease social contacts for group:",
+              choices = c(
+                "Exposed" = "We",
+                "Asymptomatic Infections" = "W0",
+                "Mild Infections" = "W1",
+                "Severe Infections" = "W2",
+                "Critical Infections" = "W3"
+              ),
+              selected = interventionInfo$intrv[[id]]$intAgeForAgeTarget
+            ),
+            selectInput(
+              "intWhichAge1",
+              "Decrease contacts between age group:", 
+              choices = ageBounds,
+              selected = interventionInfo$intrv[[id]]$intWhichAge1
+            ),
+            selectInput(
+              "intWhichAge2",
+              ".. and age group:",
+              choices = ageBounds,
+              selected = interventionInfo$intrv[[id]]$intWhichAge2
+            ),
+            sliderInput(
+              "intAge12Magnitude",
+              "Decrease social contacts between the two age groups by %",  
+              value = interventionInfo$intrv[[id]]$intAge12Magnitude,
+              min = 0, max = 1, step = 0.01
+            )
+          ),
+          conditionalPanel(
+            condition="input.inttype == 'allForAge'",
+            selectInput(
+              "intAllForAgeTarget",
+              "Decrease social contacts for group:",
+              choices = c(
+                "Exposed" = "We",
+                "Asymptomatic Infections" = "W0",
+                "Mild Infections" = "W1",
+                "Severe Infections" = "W2",
+                "Critical Infections" = "W3"
+              ),
+              selected = interventionInfo$intrv[[id]]$intAllForAgeTarget
+            ),
+            selectInput(
+              "intWhichAge0",
+              "Select age group for which social contacts will be decreased:",
+              choices = ageBounds,
+              selected = interventionInfo$intrv[[id]]$intWhichAge0
+            ),
+            sliderInput(
+              "intAge0Magnitude",
+              "Decrease all social contacts for this age group by %", 
+              value = interventionInfo$intrv[[id]]$intAge0Magnitude,
+              min = 0, max = 1, step = 0.01
+            )
+          )
+        ),
+        fluidRow(column(1, actionButton("intrvSave", "Save"), offset = 11))
+      )
+    }
+  })
+  
+  output$interventionInputs <- renderUI({interventionInputs()})
+  
+  # commit inputs to block list object
+  observeEvent(input$intrvSave, {
+    id <- selectedIntrv$which
     
-    if(input$AllowSeason=="Yes"){
-      names(pModel.df)[names(pModel.df)=="seas.amp"] <- "Seasonal.Amplitude"
-      names(pModel.df)[names(pModel.df)=="seas.phase"] <- "Seasonal.Phase"
-    }else{
-      pModel.df$seas.amp=NULL
-      pModel.df$seas.phase=NULL
+    # set intervetnion
+    if (input$inttype == "coef") {
+      interventionInfo$intrv[[id]]$intervention <- setIntervention(
+        from = input$intstart, 
+        to = input$intend, 
+        genFunc = intervenePercentGenerator, 
+        target = input$intWhichCoef,
+        change = -input$intCoefMagnitude
+      )
+    } else if (input$inttype == "ageForAge") {
+      interventionInfo$intrv[[id]]$intervention <- setIntervention(
+        from = input$intstart, 
+        to = input$intend, 
+        genFunc = interveneContactPercentGenerator, 
+        ageBreaks = ageBounds, 
+        targetAges = c(input$intWhichAge1, input$intWhichAge2), 
+        target = input$intAgeForAgeTarget, 
+        change = -input$intAge12Magnitude
+      )
+    } else if (input$inttype == "allForAge") {
+      interventionInfo$intrv[[id]]$intervention <- setIntervention(
+        from = input$intstart, 
+        to = input$intend, 
+        genFunc = interveneContactPercentGenerator, 
+        ageBreaks = ageBounds, 
+        targetAges = c(input$intWhichAge0), 
+        target = input$intAllForAgeTarget, 
+        change = -input$intAge0Magnitude
+      )
+    } else if (input$inttype == "allContacts") {
+      interventionInfo$intrv[[id]]$intervention <- setIntervention(
+        from = input$intstart, 
+        to = input$intend, 
+        genFunc = interveneContactPercentGenerator, 
+        ageBreaks = ageBounds, 
+        targetAges = c(), 
+        target = input$intAgeAllTarget, 
+        change = -input$intAgeAllMagnitude
+      )
+    } else {
+      stop("unknown type")
     }
     
-    pModel.df=melt(pModel.df)
-    colnames(pModel.df)[1]="Parameter"
-    colnames(pModel.df)[2]="Value"
-   
-    pModel.df
-    
-  }) 
-  
-  # Show the early ratios of cases of different types using an HTML table
-  output$RatioTable <-renderTable(
-    formattedRatios(), hover = T,bordered = T,striped = F, digits=1
-  )
-  
-  formattedRatios <- reactive({
-    
-    ParamStruct=GetModelParams(input)
-    pModel=ParamStruct$pModel
-    N=ParamStruct$N
-
-    #r value and ratios
-    r.out=Getr_SEIR(pModel,N)
-    MaxEigenVector=r.out$MaxEigenVector
-    MaxEigenVector=MaxEigenVector[1:length(MaxEigenVector)-1] #remove D:D
-    
-    ratios.df=data.frame(MaxEigenVector)
-    colnames(ratios.df)[1]="Value"
-    #ratios.df = subset(ratios.df, select=c(2,1))
-    #
-    ratios.df$Ratio=c("E0:D","E1:D","I0:D","I1:D","I2:D","I3:D","R:D")
-    ratios.df = ratios.df[c(2,1)]
-    ratios.df
-    
-    
-  }) 
-  
-  # Display the model diagram
-  output$plot4 <- renderImage({
-    filename <- normalizePath(file.path('./images',"model_diagram.png"))
-    
-    list(src = filename, height=200, width=500)
-    
-  }, deleteFile = FALSE)
-  
-  
-  output$parameterDesc <- renderUI({
-    tags$iframe(src="Parameters.nb.html",width="100%",frameBorder="0",height="7000px")
+    # save input values
+    interventionInfo$intrv[[id]]$inttype <- input$inttype
+    interventionInfo$intrv[[id]]$intstart <- input$intstart
+    interventionInfo$intrv[[id]]$intend <- input$intend
+    interventionInfo$intrv[[id]]$intWhichCoef <- input$intWhichCoef
+    interventionInfo$intrv[[id]]$intCoefMagnitude <- input$intCoefMagnitude
+    interventionInfo$intrv[[id]]$intWhichAge1 <- input$intWhichAge1
+    interventionInfo$intrv[[id]]$intWhichAge2 <- input$intWhichAge2
+    interventionInfo$intrv[[id]]$intAge12Magnitude <- input$intAge12Magnitude
+    interventionInfo$intrv[[id]]$intWhichAge0 <- input$intWhichAge0
+    interventionInfo$intrv[[id]]$intAge0Magnitude <- input$intAge0Magnitude
+    interventionInfo$intrv[[id]]$intAgeAllMagnitude <- input$intAgeAllMagnitude
+    interventionInfo$intrv[[id]]$intAgeForAgeTarget <- input$intAgeForAgeTarget
+    interventionInfo$intrv[[id]]$intAllForAgeTarget <- input$intAllForAgeTarget
+    interventionInfo$intrv[[id]]$intAgeAllTarget <- input$intAgeAllTarget
   })
   
-  output$Tutorial <- renderUI({
-    tags$iframe(src="Tutorial.html",width="100%",frameBorder="0",height="5000px")
-  })
+  # there's got to be a more elegant way..
+  observeEvent(input$remIntrv1, {interventionInfo$intrv[[1]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv2, {interventionInfo$intrv[[2]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv3, {interventionInfo$intrv[[3]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv4, {interventionInfo$intrv[[4]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv5, {interventionInfo$intrv[[5]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv6, {interventionInfo$intrv[[6]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv7, {interventionInfo$intrv[[7]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv8, {interventionInfo$intrv[[8]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv9, {interventionInfo$intrv[[9]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv10, {interventionInfo$intrv[[10]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv11, {interventionInfo$intrv[[11]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv12, {interventionInfo$intrv[[12]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv13, {interventionInfo$intrv[[13]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv14, {interventionInfo$intrv[[14]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv15, {interventionInfo$intrv[[15]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv16, {interventionInfo$intrv[[16]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv17, {interventionInfo$intrv[[17]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv18, {interventionInfo$intrv[[18]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv19, {interventionInfo$intrv[[19]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv20, {interventionInfo$intrv[[20]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv21, {interventionInfo$intrv[[21]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv22, {interventionInfo$intrv[[22]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv23, {interventionInfo$intrv[[23]] <- NULL; countIntrv$n <- countIntrv$n - 1})
+  observeEvent(input$remIntrv24, {interventionInfo$intrv[[24]] <- NULL; countIntrv$n <- countIntrv$n - 1})
   
-  # Return the case fatality rate to the user as the % severe infections is changed
+  observeEvent(input$selIntrv1, {selectedIntrv$which <- 1})
+  observeEvent(input$selIntrv2, {selectedIntrv$which <- 2})
+  observeEvent(input$selIntrv3, {selectedIntrv$which <- 3})
+  observeEvent(input$selIntrv4, {selectedIntrv$which <- 4})
+  observeEvent(input$selIntrv5, {selectedIntrv$which <- 5})
+  observeEvent(input$selIntrv6, {selectedIntrv$which <- 6})
+  observeEvent(input$selIntrv7, {selectedIntrv$which <- 7})
+  observeEvent(input$selIntrv8, {selectedIntrv$which <- 8})
+  observeEvent(input$selIntrv9, {selectedIntrv$which <- 9})
+  observeEvent(input$selIntrv10, {selectedIntrv$which <- 10})
+  observeEvent(input$selIntrv11, {selectedIntrv$which <- 11})
+  observeEvent(input$selIntrv12, {selectedIntrv$which <- 12})
+  observeEvent(input$selIntrv13, {selectedIntrv$which <- 13})
+  observeEvent(input$selIntrv14, {selectedIntrv$which <- 14})
+  observeEvent(input$selIntrv15, {selectedIntrv$which <- 15})
+  observeEvent(input$selIntrv16, {selectedIntrv$which <- 16})
+  observeEvent(input$selIntrv17, {selectedIntrv$which <- 17})
+  observeEvent(input$selIntrv18, {selectedIntrv$which <- 18})
+  observeEvent(input$selIntrv19, {selectedIntrv$which <- 19})
+  observeEvent(input$selIntrv20, {selectedIntrv$which <- 20})
+  observeEvent(input$selIntrv21, {selectedIntrv$which <- 21})
+  observeEvent(input$selIntrv22, {selectedIntrv$which <- 22})
+  observeEvent(input$selIntrv23, {selectedIntrv$which <- 23})
+  observeEvent(input$selIntrv24, {selectedIntrv$which <- 24})
   
-  output$CFR <- renderText({ 
-    CFR=(input$ProbDeath/100)*(input$FracCritical)
-    HTML(paste("<b> Case fatality ratio:</b>",CFR,"%"))
-  })
-  
-  # ------------Set the sliders/forms that have dynamic values based on other sliders ----------------------
-  
-  #Get default hospital capacity parameters and create sliders 
-  output$HospBedper <- renderUI({
-    numericInput("HospBedper","Total (per 1000 ppl)",value = signif(hdata$HospBedper,digits=3), min = 0, step = 0.1)
-  })
-  output$HospBedOcc <- renderUI({
-    numericInput("HospBedOcc","Occupancy (%)",value = signif(hdata$HospBedOcc,digits=3)*100, min = 0, max = 100, step = 0.1)
-  })
-  output$ICUBedper <- renderUI({
-    numericInput("ICUBedper","Total (per 1000 ppl)",value = signif(hdata$ICUBedper,digits=3), min = 0, step = 0.01)
-  })
-  output$ICUBedOcc <- renderUI({
-    numericInput("ICUBedOcc","Occupancy (%)",value = signif(hdata$ICUBedOcc,digits=3)*100, min = 0, max = 100, step = 1)
-  })
-  output$IncFluOcc <- renderUI({
-    numericInput("IncFluOcc","Increased occupancy during flu season (%)",value = signif(hdata$IncFluOcc,digits=3)*100, min = 0, max = 100, step = 1)
-  })
-  output$ConvVentCap <- renderUI({
-    numericInput("ConvMVCap","Conventional",value = signif(hdata$ConvMVCap,digits=3), min = 0, step = 0.01)
-  })
-  output$ContVentCap <- renderUI({
-    numericInput("ContMVCap","Contingency",value = signif(hdata$ContMVCap,digits=3), min = 0, step = 0.01)
-  })
-  output$CrisisVentCap <- renderUI({
-    numericInput("CrisisMVCap","Crisis",value = signif(hdata$CrisisMVCap,digits=3), min = 0, step = 0.01)
-  })
-  
-  #make sure the fraction of individuals in each stage of infection sums to 100%
-  observeEvent(input$FracSevere,  {
-    maxFracCritical=100-input$FracSevere
-    updateSliderInput(session = session, inputId = "FracCritical", max = maxFracCritical)
-  })
-  
-  #Make sure the part of the incubation period that leads to transmission is less than total incubation period
-  observeEvent(input$IncubPeriod,  {
-    maxPresymPeriod=input$IncubPeriod
-    updateSliderInput(session = session, inputId = "PresymPeriod", max = maxPresymPeriod)
-  })
-  
-  #Make sure the intervention doesn't end before it starts, and doesn't end after total simulation time
-  #Just do for Intervention tab, Capacity tab will copy these values
-  observeEvent(input$Tint,  {
-    updateSliderInput(session = session, inputId = "Tend", min = input$Tint)
-    #updateSliderInput(session = session, inputId = "TendC", min = input$Tint)
-  })
-  observeEvent(input$Tmax,  {
-    updateSliderInput(session = session, inputId = "Tend", max = input$Tmax)
-    #updateSliderInput(session = session, inputId = "TendC", max = input$Tmax)
-    
-    # if(input$Tmax<input$Tend){
-    #   updateSliderInput(session = session, inputId = "Tend", value = input$Tmax)
-    # }
-    # if(input$Tmax<input$TendC){
-    #   updateSliderInput(session = session, inputId = "TendC", value = input$Tmax)
-    # }
-    
-  })
-  
-  #Update intervention sliders on capacity tab to match intervention tab
-  observeEvent(input$Tint,  {
-    updateSliderInput(session = session, inputId = "TintC", value = input$Tint)
-  })
-  observeEvent(input$Tend,  {
-    updateSliderInput(session = session, inputId = "TendC", value = input$Tend)
-  })
-  observeEvent(input$s1,  {
-    updateSliderInput(session = session, inputId = "s1C", value = input$s1)
-  })
-  observeEvent(input$s2,  {
-    updateSliderInput(session = session, inputId = "s2C", value = input$s2)
-  })
-  observeEvent(input$s3,  {
-    updateSliderInput(session = session, inputId = "s3C", value = input$s3)
-  })
-  observeEvent(input$s0,  {
-    updateSliderInput(session = session, inputId = "s0C", value = input$s0)
-  })
-  
-  #And vice versa
-  
-  observeEvent(input$TintC,  {
-    updateSliderInput(session = session, inputId = "Tint", value = input$TintC)
-  })
-  observeEvent(input$TendC,  {
-    updateSliderInput(session = session, inputId = "Tend", value = input$TendC)
-  })
-  observeEvent(input$s1C,  {
-    updateSliderInput(session = session, inputId = "s1", value = input$s1C)
-  })
-  observeEvent(input$s2C,  {
-    updateSliderInput(session = session, inputId = "s2", value = input$s2C)
-  })
-  observeEvent(input$s3C,  {
-    updateSliderInput(session = session, inputId = "s3", value = input$s3C)
-  })
-  observeEvent(input$s0C,  {
-    updateSliderInput(session = session, inputId = "s0", value = input$s0C)
-  })
-
-  # Reset all parameters if the RESET button is pushed
-  observeEvent(input$reset,{
-    updateSliderInput(session,'IncubPeriod',value = 5)
-    updateSliderInput(session,'DurMildInf',value = 6)
-    updateSliderInput(session,'FracSevere',value = 15)
-    updateSliderInput(session,'FracCritical',value = 6)
-    updateSliderInput(session,'ProbDeath',value = 40)
-    updateSliderInput(session,'DurHosp',value = 6)
-    updateSliderInput(session,'TimeICUDeath',value = 8)
-    updateSliderInput(session,'b1',value = 0.5)
-    updateSliderInput(session,'b2',value = 0.1)
-    updateSliderInput(session,'b3',value = 0.1)
-    updateSliderInput(session,'N',value = 1000)
-    updateSliderInput(session,'Tmax',value = 300)
-    updateSliderInput(session,'InitInf',value = 1)
-  })
-   
 }

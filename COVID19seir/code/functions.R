@@ -36,7 +36,6 @@ SetODEs_SEIR=function(t,y,p){
   })
 }
 
-
 # ----------------------------------------------------------------------------
 # GetSpread_SEIR function:
 # --------------------
@@ -46,11 +45,11 @@ SetODEs_SEIR=function(t,y,p){
 #        y0 - named list of initial conditions for each variable
 # OUTPUT: Dataframe with rows as timepoints and columns as variables
 
-GetSpread_SEIR = function(p,Tmax,y0){
+GetSpread_SEIR = function(p,Tmax,y0, setterFunc = SetODEs_SEIR){
   
   t = seq(from=0, to=Tmax, by=1)
   
-  out = ode(y=y0, times=t, func=SetODEs_SEIR, parms=p)
+  out = ode(y=y0, times=t, func=setterFunc, parms=p)
   
   df = as.data.frame(out)
   

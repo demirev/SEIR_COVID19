@@ -3,262 +3,312 @@ library(shinyWidgets)
 library(plotly)
 
 fluidPage(
-  titlePanel("Modeling COVID-19 Spread vs Healthcare Capacity"),
+  titlePanel("Age-Specific Pandemic Model"),
   hr(),
-  p(div(HTML("Disclaimer: This simulation is for research and educational purposes only and is not intended to be a tool for decision-making. There are many uncertainties and debates about the details of COVID-19 infection and transmission and there are many limitations to this simple model. This work is licensed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>"))),
-  
+  fluidRow(
+    column(
+      12,
+      p(div(HTML("Disclaimer: This dashboard is based on an excellent tool by Alison Hill which can be found at <a href=https://alhill.shinyapps.io/COVID19seir/> this address <\a>. As such it is also distributed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>. Changes made include the introduction of different age groups and contact matrices as well as the option for multiple interventions. All errors and omissions in the changes introduced in this version are my own."))),
+      offset = 0
+    )
+  ),
+  fluidRow(
+    column(
+      12,
+      p(div(HTML("Disclaimer: I am not an epidemiologist and all work on the tool below has been strictly for my own educational purposes. I make no claims that this tool can be used to accurately model any real pandemic. There is considerable uncertainty in all default parameters. This tool is not intended to be taken as policy advice or expert opinion. This dashboard is a work-in-progress. It has not been independently reviewed and some bugs and errors are to be expected."))),
+      offset = 0
+    )
+  ),
   
   sidebarLayout(
-    
     sidebarPanel(
-      
-      fluidRow(
-        column(width=6,
-               
-               setSliderColor(c(rep("#b2df8a", 3)), sliderId=c(8,9,10)),
-               h4(div(HTML("<em>Set clinical parameters...</em>"))),
-               sliderInput("IncubPeriod", "Duration of incubation period", 0, 20, 5, step=0.5, post = " days"),
-               sliderInput("DurMildInf", "Duration of mild infections", 0, 20, 6, step=1, post = " days"),
-               sliderInput("FracSevere", "% of infections that are severe", 0, 100, 15, step=1, pre="%"),
-               sliderInput("DurHosp", "Duration of severe infection (hospital stay)", 0, 10, 6, step=1, post = " days"),
-               sliderInput("FracCritical", "% of infections that are critical",0, 20, 5, step=1, pre="%"),
-               sliderInput("TimeICUDeath", "Duration critical infection (ICU stay)", 0, 30, 8, step=1, post = " days"),
-               sliderInput("ProbDeath", "Death rate for critical infections", 0, 100, 40, step=1, pre="%"),
-               htmlOutput("CFR"),
-               br(),
-               #hr()
-               
-               ),
-        column(width=6,
-               
-               h4(div(HTML("<em>Set transmission rates...</em>"))),
-               sliderInput("b1", div(HTML("Mild infections")), 0, 3, 0.5, step=0.01, post="/day"),
-               sliderInput("b2", div(HTML("Severe infections")),0, 3, 0.1, step=0.01, post="/day"),
-               sliderInput("b3", div(HTML("Critical infections")),0, 3, 0.1, step=0.01, post="/day"),
-               radioButtons("AllowSeason", "Allow seasonality in transmission?",
-                            choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="No"),
-               conditionalPanel(
-                 condition="input.AllowSeason == 'Yes'",
-                 sliderInput("seas.amp", "Amplitude of seasonality", 0, 100, 0, step=10, pre="%"),
-                 sliderInput("seas.phase", "Day of peak transmission (relative to t=0)", -365, 365, 0, step=1, post = " days"),
-               ),
-               radioButtons("AllowAsym", "Allow asymptomatic infections?",
-                            choices = list("Yes" = "Yes","No" = "No"),inline=TRUE,selected="No"),
-               conditionalPanel(
-                 condition="input.AllowAsym == 'Yes'",
-                 sliderInput("FracAsym", "% of infections that are asymptomatic", 0, 100, 30, step=1, pre="%"),
-                 sliderInput("DurAsym", "Duration of asymptomatic infections", 1, 20, 6, step=1, post = " days"),
-                 sliderInput("b0", div(HTML("Asymptomatic transmission rate")), 0, 3, 0.5, step=0.02, post="/day"),
-               ),
-                      radioButtons("AllowPresym", "Allow pre-symptomatic transmission?",
-                                   choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="No"),
-               conditionalPanel(
-                 condition="input.AllowPresym == 'Yes'",
-                 sliderInput("PresymPeriod", "Time before symptom onset at which transmission is possible", 0, 3, 2, step=0.5, post = " days"), #Make reactive
-                 sliderInput("be", div(HTML("Presymptomatic transmission rate")),0, 3, 0.5, step=0.02, post="/day"),
-               ),
-               hr(),
-
+      navbarPage(
+        "Parameters:",
+        tabPanel(
+          "General Parameters",
+          h4(div(HTML("<em>Set simulation values...</em>"))),
+          #sliderInput("LogN", div(HTML("Total population size (log10)")), 1, 9, 3, step=0.1),
+          #htmlOutput("N"),
+          column(
+            width=12,
+            numericInput("InitInf","Initial # infected per age group:",value = 1, min = 1, step = 1)
+          ),
+          sliderInput("Tmax", div(HTML("Maximum time")),100, 3000, 1000, step=10, post=" days"),
+          br(),
+          h4(div(HTML("<em>Set clinical parameters for all age groups...</em>"))),
+          sliderInput("IncubPeriod", "Duration of incubation period", 0, 20, 5, step=0.5, post = " days"),
+          sliderInput("DurMildInf", "Duration of mild infections", 0, 20, 6, step=1, post = " days"),
+          sliderInput("DurHosp", "Duration of severe infection (hospital stay)", 0, 10, 6, step=1, post = " days"),
+          sliderInput("TimeICUDeath", "Duration critical infection (ICU stay)", 0, 30, 8, step=1, post = " days"),
+          sliderInput("NaturalDeath", "Daily probability of dying of other causes", 0, 1, 0, step=0.01)
+        ),
+        tabPanel(
+          "Transmission Paramters",
+        
+          h4(div(HTML("<em>Set probability of transmission...</em>"))),
+          sliderInput("b1", div(HTML("Probability of transmission after contact with mild infections")), 0, 1, 0.05, step=0.01, post=""),
+          sliderInput("b2", div(HTML("Probability of transmission after contact with severe infections")),0, 1, 0.2, step=0.01, post=""),
+          sliderInput("b3", div(HTML("Probability of transmission after contact with critical infections")),0, 1, 0.4, step=0.01, post=""),
+          sliderInput("SocConMild", "Social contacts of mild cases relative to healthy individuals", 0, 1, 0.3, step=0.01),
+          sliderInput("SocConSevere", "Social contacts of severe cases relative to healthy individuals", 0, 1, 0.1, step=0.01),
+          sliderInput("SocConCritical", "Social contacts of critical cases relative to healthy individuals", 0, 1, 0.02, step=0.01),
+          sliderInput("LoseImunity", "Daily probability of losing immunity for recovered cases", 0, 1, 0.0, step=0.01),
+          radioButtons("AllowAsym", "Allow asymptomatic infections?",
+                       choices = list("Yes" = "Yes","No" = "No"),inline=TRUE,selected="Yes"),
+          conditionalPanel(
+            condition="input.AllowAsym == 'Yes'",
+            sliderInput("FracAsym", "% of infections that are asymptomatic", 0, 1, 0.3, step=0.01, pre=),
+            sliderInput("DurAsym", "Duration of asymptomatic infections", 1, 20, 6, step=1, post = " days"),
+            sliderInput("b0", div(HTML("Asymptomatic transmission probability")), 0, 1, 0.03, step=0.01, post="")
+          ),
+          radioButtons(
+            "AllowPresym", "Allow pre-symptomatic transmission?",
+            choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="Yes"
+          ),
+          conditionalPanel(
+            condition="input.AllowPresym == 'Yes'",
+            sliderInput("PresymPeriod", "Time before symptom onset at which transmission is possible", 0, 3, 2, step=0.5, post = " days"), #Make reactive
+            sliderInput("be", div(HTML("Presymptomatic transmission probability")),0, 1, 0.03, step=0.01, post="")
+          ),
+          radioButtons("AllowSeason", "Allow seasonality in transmission?",
+                       choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="Yes"),
+          conditionalPanel(
+            condition="input.AllowSeason == 'Yes'",
+            sliderInput("seas.amp", "Amplitude of seasonality", 0, 100, 0, step=10, pre="%"),
+            sliderInput("seas.phase", "Day of peak transmission (relative to t=0)", -365, 365, 0, step=1, post = " days")
+          )
+          
+        ),
+        tabPanel(
+          "Population Per Age Group",
+          numericInput("N1", div(HTML("Population < 4:")), value=250105, max=10^10, min=1000, step=1000),
+          numericInput("N2", div(HTML("Population 4 - 7:")), value=285689, max=10^10, min=1000, step=1000),
+          numericInput("N3", div(HTML("Population 8 - 12:")), value=353589, max=10^10, min=1000, step=1000),
+          numericInput("N4", div(HTML("Population 13 - 18:")), value=374042, max=10^10, min=1000, step=1000),
+          numericInput("N5", div(HTML("Population 19 - 25:")), value=501729, max=10^10, min=1000, step=1000),
+          numericInput("N6", div(HTML("Population 26 - 35:")), value=950932, max=10^10, min=1000, step=1000),
+          numericInput("N7", div(HTML("Population 36 - 50:")), value=1556518, max=10^10, min=1000, step=1000),
+          numericInput("N8", div(HTML("Population 51 - 65:")), value=1452168, max=10^10, min=1000, step=1000),
+          numericInput("N9", div(HTML("Population 66 - 75:")), value=824867, max=10^10, min=1000, step=1000),
+          numericInput("N10", div(HTML("Population 76 - 85:")), value=435116, max=10^10, min=1000, step=1000),
+          numericInput("N11", div(HTML("Population > 85:")), value=117696, max=10^10, min=1000, step=1000)
+        ),
+        tabPanel(
+          "Severe Infections Per Age Group",
+          sliderInput("FracSevere1", "% of infections that are severe < 4", 0, 1, 0.001, step=.01),
+          sliderInput("FracSevere2", "% of infections that are severe 4 - 7", 0, 1, 0.002, step=.01),
+          sliderInput("FracSevere3", "% of infections that are severe 8 - 12", 0, 1, 0.005, step=.01),
+          sliderInput("FracSevere4", "% of infections that are severe 13 - 18", 0, 1, 0.01, step=.01),
+          sliderInput("FracSevere5", "% of infections that are severe 19 - 35", 0, 1, 0.02, step=.01),
+          sliderInput("FracSevere6", "% of infections that are severe 36 - 50", 0, 1, 0.04, step=.01),
+          sliderInput("FracSevere7", "% of infections that are severe 51 - 65", 0, 1, 0.08, step=.01),
+          sliderInput("FracSevere8", "% of infections that are severe 66 - 75", 0, 1, 0.15, step=.01),
+          sliderInput("FracSevere9", "% of infections that are severe 76 - 85", 0, 1, 0.20, step=.01),
+          sliderInput("FracSevere10", "% of infections that are severe 76 - 85", 0, 1, 0.25, step=.01),
+          sliderInput("FracSevere11", "% of infections that are severe > 85", 0, 1, 0.35, step=.01)
+        ),
+        tabPanel(
+          "Critical Infections Per Age Group",
+          sliderInput("FracCritical1", "% of infections that are critical < 4", 0, 1, 0.0001, step=.01),
+          sliderInput("FracCritical2", "% of infections that are critical 4 - 7", 0, 1, 0.0002, step=.01),
+          sliderInput("FracCritical3", "% of infections that are critical 8 - 12", 0, 1, 0.0005, step=.01),
+          sliderInput("FracCritical4", "% of infections that are critical 13 - 18", 0, 1, 0.001, step=.01),
+          sliderInput("FracCritical5", "% of infections that are critical 19 - 35", 0, 1, 0.002, step=.01),
+          sliderInput("FracCritical6", "% of infections that are critical 36 - 50", 0, 1, 0.01, step=.01),
+          sliderInput("FracCritical7", "% of infections that are critical 51 - 65", 0, 1, 0.04, step=.01),
+          sliderInput("FracCritical8", "% of infections that are critical 66 - 75", 0, 1, 0.07, step=.01),
+          sliderInput("FracCritical9", "% of infections that are critical 76 - 85", 0, 1, 0.10, step=.01),
+          sliderInput("FracCritical10", "% of infections that are critical 76 - 85", 0, 1, 0.15, step=.01),
+          sliderInput("FracCritical11", "% of infections that are critical > 85", 0, 1, 0.20, step=.01)
+        ),
+        tabPanel(
+          "Death Rate of Critical Infections Per Age Group",
+          h4(div(HTML("<em>Change probability of lethal outcome of critical casess...</em>"))),
+          sliderInput("ProbDeath1", "Death probability for critical infections < 4", 0, 1, 0.3, step=.01),
+          sliderInput("ProbDeath2", "Death probability for critical infections 4 - 7", 0, 1, 0.2, step=.01),
+          sliderInput("ProbDeath3", "Death probability for critical infections 8 - 12", 0, 1, 0.1, step=.01),
+          sliderInput("ProbDeath4", "Death probability for critical infections 13 - 18", 0, 1, 0.05, step=.01),
+          sliderInput("ProbDeath5", "Death probability for critical infections 19 - 35", 0, 1, 0.1, step=.01),
+          sliderInput("ProbDeath6", "Death probability for critical infections 36 - 50", 0, 1, 0.2, step=.01),
+          sliderInput("ProbDeath7", "Death probability for critical infections 51 - 65", 0, 1, 0.3, step=.01),
+          sliderInput("ProbDeath8", "Death probability for critical infections 66 - 75", 0, 1, 0.4, step=.01),
+          sliderInput("ProbDeath9", "Death probability for critical infections 76 - 85", 0, 1, 0.5, step=.01),
+          sliderInput("ProbDeath10", "Death probability for critical infections 76 - 85", 0, 1, 0.6, step=.01),
+          sliderInput("ProbDeath11", "Death probability for critical infections > 85", 0, 1, 0.7, step=.01)
+        ),
+        tabPanel(
+          "Contact Rate Per Age Group",
+          h4(div(HTML("<em>Change default values of daily contacts between age groups...</em>"))),
+          uiOutput("ageContacts")
         )
       ),
-      h4(div(HTML("<em>Set simulation values...</em>"))),
-      #sliderInput("LogN", div(HTML("Total population size (log10)")), 1, 9, 3, step=0.1),
-      #htmlOutput("N"),
-      column(width=5,
-             numericInput("N", div(HTML("Population size:")), value=1000, max=10^10, min=1000, step=1000)
-      ),
-      column(width=5,
-             numericInput("InitInf","Initial # infected:",value = 1, min = 1, step = 1)
-      ),
-      #br(),
-      sliderInput("Tmax", div(HTML("Maximum time")),0, 1000, 300, step=10, post=" days"),
-      actionButton("reset", "Reset all"),    
-      width=5
+      width = 5
     ),
+
     
     mainPanel(
       
-      #p(div(HTML("Test")))
-      navbarPage("Output:",
-                 
-                 tabPanel("Spread",
-                          fluidPage(
-                            fluidRow(
-                              
-                              h3("Predicted COVID-19 cases by clinical outcome"),
-                              p(HTML("Simulate the natural course of a COVID-19 epidemic in a single population without any interventions.")),
-                              
-                              plotlyOutput("plot0"),
-                              br(),
-                              br(),
-                              column(width=6,
-                                     radioButtons("yscale", "Y axis scale:",
-                                                  choices = list("Linear" = "linear","Log10" = "log"),inline=TRUE)
-                                     ),
-                              column(width=6,
-                                     radioButtons("PlotCombine", "Plot total infected?",
-                                                  choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="No")
-                              ),
-                              br(),
-                              p(HTML("<b>User instructions:</b> The graph shows the expected numbers of individuals over time who are infected, recovered, susceptible, or dead over time. Infected individuals first pass through an exposed/incubation phase where they are asymptomatic and not infectious, and then move into a symptomatic and infections stage classified by the clinical status of infection (mild, severe, or critical). A more detailed description of the model is provided in the Model Description tab. The population size, initial condition, and parameter values used to simulate the spread of infection can be specified through the sliders located in the left-hand panel. Default slider values are equal to estimates taken from the literature (see Sources tab). To reset default values, click on the <em>Reset all</em> button located on the bottom of the panel. The plot is interactive: Hover over it to get values, double-click a curve in the legend to isolate it, or single-click to remove it. Dragging over a range allows zooming."))
-                            )
-                          )
-                 ),
-                 
-                 tabPanel("Intervention",
-                          fluidPage(
-                            fluidRow(
-                              h3("Reduction in predicted COVID-19 after intervention"),
-                              p(HTML("Simulate the change in the time course of COVID-10 cases after applying an intervention")),
-                              plotlyOutput("plotInt"),
-                              br(),
-                              br(),
-                              radioButtons("yscaleInt", "Y axis scale:",
-                                           choices = list("Linear" = "linear","Log10" = "log"),inline=TRUE),
-                              wellPanel(
-                                h4(div(HTML("<em>Set intervention parameters...</em>"))),
-                                selectInput("VarShowInt",
-                                            label = "Select variable to show:",
-                                            choices = c("Suceptible (S)"="S", "Exposed (E)"="E", "Mild Infections (I1)"="I1", "Severe Infections (I2)"="I2", "Critical Infections (I3)"="I3", "Recovered (R)"="R", "Dead (D)"="D", "All infected (E + all I)"="Inf","All symptomatic (I1+I2+I3)"="Cases","All hospitalized (I2+I3)"="Hosp"),
-                                            selected = c("Cases")
-                                ),
-                                column(width=6,
-                                         numericInput("Tint","Intervention start time (days):",value = 0, min = 0, step = 10)
-                                         ),
-                                  column(width=6,
-                                         numericInput("Tend","Intervention end time (days):",value = 300, min = 0, step = 10)
-                                         ),
-                                p(HTML("<b>Intervention type: reducing transmission, </b> for example via social distancing or quarantining in the community (for those with mild infection) or better isolation and personal-protective wear in hospitals (for those with more severe infection). Transmission from each of the clinical stages of infection can only be reduced if the user has chosen parameters such that these stages contribute to transmission.")),
-                                sliderInput("s1", "Reduction in transmission from mild infections ", 0, 100, 30, pre="%",step=1, animate=TRUE),
-                                sliderInput("s2", "Reduction in transmission from severe infections", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                sliderInput("s3", "Reduction in transmission rate from critical infections", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                conditionalPanel(
-                                  condition="input.AllowAsym == 'Yes' || input.AllowPresym == 'Yes' ",
-                                  sliderInput("s0", "Reduction in transmission from pre/asymptomatic infections ", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                ),
-                                radioButtons("RoundOne", "Round values to nearest integar post-intervention?",
-                                             choices = list("True" = "True","False" = "False"),inline=TRUE),
-                              ),
-                              p(HTML("<b>User instructions:</b> The graph shows the expected numbers of individuals over time who are infected, recovered, susceptible, or dead over time, with and without an intervention. Infected individuals first pass through an exposed/incubation phase where they are asymptomatic and not infectious, and then move into a symptomatic and infections stage classified by the clinical status of infection (mild, severe, or critical). A more detailed description of the model is provided in the Model Description tab. The population size, initial condition, and parameter values used to simulate the spread of infection can be specified through the sliders located in the left-hand panel. Default slider values are equal to estimates taken from the literature (see Sources tab). The strength and timing of the intervention is controlled by the sliders below the plot. To reset default values, click on the <em>Reset all</em> button located on the bottom of the panel. The plot is interactive: Hover over it to get values, double-click a curve in the legend to isolate it, or single-click to remove it. Dragging over a range allows zooming."))
-                            )
-                          )
-                 ),
-                 
-                 tabPanel("Capacity",
-                          fluidPage(
-                            fluidRow(
-                              h3("COVID-19 Cases vs Healthcare Capacity"),
-                              p(HTML("Simulate predicted COVID-19 cases vs the capacity of the healthcare system to care for them. The care required depends on disease severity - individuals with `severe' infection require hospitalization and individuals with 'critical' infection often require ICU-level care and mechanical ventilation.")),
-                              plotlyOutput("plotCap"),
-                              br(),
-                              br(),
-                              radioButtons("yscaleCap", "Y axis scale:",
-                                           choices = list("Linear" = "linear","Log10" = "log"),inline=TRUE),
-                              wellPanel(
-                                h4(div(HTML("<em>Set healthcare capacity...</em>"))),
-                                p(HTML(" The default values are for the U.S. and details of their sources are given in the Sources tab")),
-                                #Sliders for hospital capacity are reactive, since they take in default values from a file, so they are defined in the server file.  
-                                fluidRow(
-                                  p(HTML(" <b> All hospital beds: </b>")),
-                                  column(width = 6,
-                                         uiOutput("HospBedper")
-                                  ),
-                                  column(width = 6,
-                                         uiOutput("HospBedOcc")
-                                  ),
-                                  p(HTML(" <b> ICU beds: </b>")),
-                                  column(width = 6,
-                                         uiOutput("ICUBedper")
-                                  ),
-                                  column(width = 6,
-                                         uiOutput("ICUBedOcc")
-                                  ),
-                                  column(width = 12,
-                                         uiOutput("IncFluOcc")
-                                  ),
-                                  p(HTML(" <b> Mechanical ventilators: </b>")),
-                                  column(width = 4,
-                                         uiOutput("ConvVentCap")
-                                  ),
-                                  column(width = 4,
-                                         uiOutput("ContVentCap")
-                                  ),
-                                  column(width = 4,
-                                         uiOutput("CrisisVentCap")
-                                  )
-                                ),
-                                ),
-                              wellPanel(
-                                h4(div(HTML("<em>Set intervention parameters...</em>"))),
-                                selectInput("VarShowCap",
-                                            label = "Select variable to show:",
-                                            choices = c("Critical Infections (I3) vs ICU beds"="I3bed", "Critical Infections (I3) vs ventilator capacity"="I3mv", "Severe + Critical Infections (I2+I3) vs Hospital Beds"="Hosp", "All symptomatic cases (I1+I2+I3) vs Hospital Beds"="CasesCap"),
-                                            selected = c("Hosp")
-                                ),
-                                column(width=6,
-                                       numericInput("TintC","Intervention start time (days):",value = 0, min = 0, step = 10)
-                                ),
-                                column(width=6,
-                                       numericInput("TendC","Intervention end time (days):",value = 300, min = 0, step = 10)
-                                ),
-                                p(HTML("<b>Intervention type: reducing transmission, </b> for example via social distancing or quarantining in the community (for those with mild infection) or better isolation and personal-protective wear in hospitals (for those with more severe infection). Transmission from each of the clinical stages of infection can only be reduced if the user has chosen parameters such that these stages contribute to transmission.")),
-                                sliderInput("s1C", "Reduction in transmission rate (mild infections) ", 0, 100, 30, pre="%",step=1, animate=TRUE),
-                                sliderInput("s2C", "Reduction in transmission rate (severe infections) ", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                sliderInput("s3C", "Reduction in transmission rate (critical infections) ", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                conditionalPanel(
-                                  condition="input.AllowAsym == 'Yes' || input.AllowPresym == 'Yes' ",
-                                  sliderInput("s0C", "Reduction in transmission from pre/asymptomatic infections ", 0, 100, 0, pre="%",step=1, animate=TRUE),
-                                ),
-                                radioButtons("RoundOneCap", "Round values to nearest integar post-intervention?",
-                                             choices = list("True" = "True","False" = "False"), inline=TRUE),
-                              ),
-                              p(HTML("<b>User instructions:</b> The graph shows the expected numbers of individuals over time who are infected, recovered, susceptible, or dead over time, with and without an intervention. Infected individuals first pass through an exposed/incubation phase where they are asymptomatic and not infectious, and then move into a symptomatic and infections stage classified by the clinical status of infection (mild, severe, or critical). A more detailed description of the model is provided in the Model Description tab. The population size, initial condition, and parameter values used to simulate the spread of infection can be specified through the sliders located in the left-hand panel. Default slider values are equal to estimates taken from the literature (see Sources tab). The strength and timing of the intervention is controlled by the sliders below the plot. To reset default values, click on the <em>Reset all</em> button located on the bottom of the panel. The plot is interactive: Hover over it to get values, double-click a curve in the legend to isolate it, or single-click to remove it. Dragging over a range allows zooming."))
-                            )
-                          )
-                 ),
-
-                 tabPanel("Model", br(),
-                          fluidRow(column(12,
-                                          withMathJax(),
-                                          h2("Model Description"),
-                                          plotOutput("plot4", height=200),
-                                          includeMarkdown("SEIR.Rmd"),
-                                          #h3("Equations"),
-                                          br(),
-                                          h2("Output"),
-                                          h3("Rate parameters of dynamic model"),
-                                          p(HTML("These parameters can be changed using the sliders in the other tabs. The values in this table represent the current values chosen via the sliders. Note that the transmission rates chosen by the sliders are always scaled by \\(N\\), so that \\(\\beta*N\\) is constant as \\(N\\) changes.")),
-                                          tableOutput("ParameterTable"),br(),
-                                          h3("Ratios of cases during early growth phase"),
-                                          p(HTML("These values are calculated based on the current model parameters")),
-                                          tableOutput("RatioTable"),br(),
-                          ))),
-                 
-                 tabPanel("Sources",
-                          fluidPage(
-                            br(),
-                            uiOutput("parameterDesc")
-                          )),
-                 # tabPanel("Output",
-                 #          fluidPage(
-                 #            br(),
-                 #            h3("Rate parameters of dynamic model"),
-                 #            p(HTML("These parameters can be changed using the sliders in the other tabs. The values in this table represent the current values chosen via the sliders. Note that the transmission rates chosen by the sliders are always scaled by \\(N\\), so that \\(\\beta*N\\) is constant as \\(N\\) changes.")),
-                 #            tableOutput("ParameterTable"),br(),br(),
-                 #          )),
-                 tabPanel("Tutorial",
-                          fluidPage(
-                            br(),
-                            uiOutput("Tutorial")
-                            #includeMarkdown("Tutorial.Rmd")
-                          )),
-                 
-                 tabPanel("About",
-                          fluidPage(
-                            br(),
-                            includeMarkdown("About.Rmd")
-                          ))
-                 
+      navbarPage(
+        "Output:",
+     
+        tabPanel("Spread",
+          fluidPage(
+            fluidRow(
+              h3("Predicted cases by clinical outcome"),
+              p(HTML("Simulate the natural course of an epidemic in a single population without any interventions.")),
+              br(),
+              column(
+                width=12,
+                radioButtons(
+                  "plotType", "Plot Type:",
+                  choices = list(
+                    "All Groups" = "all",
+                    "Infected and Exposed" = "IandE",
+                    "By Age" = "byage"
+                  ),
+                  inline=TRUE,
+                  selected = "IandE"
+                )
+              ),
+              br(),
+              br(),
+              br(),
+              conditionalPanel(
+                condition="input.plotType == 'all'",
+                plotlyOutput("plotBase")
+              ),
+              conditionalPanel(
+                condition="input.plotType == 'IandE'",
+                plotlyOutput("plotEandI")
+              ),
+              conditionalPanel(
+                condition="input.plotType == 'byage'",
+                selectInput(
+                  "agePlotWhat", 
+                  "Group to plot", 
+                  choices = c("S", "E0", "E1", "I0", "I1", "I2", "I3", "R", "D")
+                ),
+                plotlyOutput("plotAge")
+              ),
+              br(),
+              p(HTML("<b>User instructions:</b> The graph shows the expected numbers of individuals over time who are infected, recovered, susceptible, or dead over time. Infected individuals first pass through an exposed/incubation phase where they are asymptomatic and not infectious, and then move into a symptomatic and infections stage classified by the clinical status of infection (mild, severe, or critical). A more detailed description of the model is provided in the Model Description tab. Use the radio buttons to switch between viewing the entire population, just the exosed and infected or a breakdown of any group by age. The population size, initial condition, and parameter values used to simulate the spread of infection can be specified through the sliders located in the left-hand panel. The plot is interactive: Hover over it to get values, double-click a curve in the legend to isolate it, or single-click to remove it. Dragging over a range allows zooming."))
+            )
+          )
+        ),
+       
+        tabPanel("Intervention",
+          fluidPage(
+            fluidRow(
+              h3("Reduction in predicted infections after interventions"),
+              p(HTML("Simulate the change in the time course of cases after applying a set of interventions")),
+              br(),
+              h4("Define Interventions"),
+              fluidRow(
+                column(
+                  3,
+                  shinydashboard::box(
+                    title = "",
+                    width = 12, collapsible = F, collapsed = F,
+                    uiOutput('interventionHeaders'),
+                    fluidRow(
+                      column(
+                        2, style = "margin-top: 20px;", #should be relative
+                        actionButton("addIntrv", "", icon = icon("plus"))     
+                      ),
+                      column(
+                        10, 
+                        textInput("newIntrv", "", placeholder = "add new intervention...")
+                      )
+                    )
+                    #background = "olive"
+                  )
+                ),
+                column(
+                  9,
+                  uiOutput('interventionInputs')       
+                )
+              ),
+              br(),
+              br(),
+              column(
+                width=12,
+                radioButtons(
+                  "plotTypeInt", "Plot Type:",
+                  choices = list(
+                    "All Groups" = "all",
+                    "Infected and Exposed" = "IandE",
+                    "By Age" = "byage"
+                  ),
+                  inline=TRUE,
+                  selected = "IandE"
+                )
+              ),
+              br(),
+              br(),
+              conditionalPanel(
+                condition="input.plotTypeInt == 'all'",
+                h4("no interventions"),
+                plotlyOutput("plotBaseInttab"),
+                h4("with interventions"),
+                plotlyOutput("plotIntInttab")
+              ),
+              conditionalPanel(
+                condition="input.plotTypeInt == 'IandE'",
+                h4("no intervention"),
+                plotlyOutput("plotEandIBaseInttab"),
+                h4("with interventions"),
+                plotlyOutput("plotEandIIntInttab")
+              ),
+              conditionalPanel(
+                condition="input.plotTypeInt == 'byage'",
+                selectInput(
+                  "agePlotWhatInt", 
+                  "Group to plot", 
+                  choices = c("S", "E0", "E1", "I0", "I1", "I2", "I3", "R", "D")
+                ),
+                h4("no intervention"),
+                plotlyOutput("plotAgeBaseInttab"),
+                h4("with interventions"),
+                plotlyOutput("plotAgeIntInttab")
+              )
+            ),
+            fluidRow(
+              br(),
+              p(HTML("<b>User instructions:</b> This tab allows the user to define a series of time limited interventions in order to simulate policy impact on the spread of the disease. To create a new intervention, first enter a name and then click the plus button. Fill in parameters and click the 'save' button. Interventions can be in the form of reduction of social contacts (e.g. social distancing measures) or in the form of reduction of overall probability of infection (e.g. mask wearing measures). For a social distancing measure select the age groups affected and the population targeted. The graph above shows the ourcome without the interventions, and the graph below shows it after the interventions."))
+            )
+          )
+        ),
+         
+        tabPanel(
+          "Model", 
+          br(),
+          fluidRow(
+            column(
+              12,
+              withMathJax(),
+              h2("Model Description"),
+              #includeMarkdown("SEIR.Rmd"),
+              br()
+            )
+          )
+        ),
+         
+        tabPanel(
+          "Sources",
+          fluidPage(
+            br()
+            #uiOutput("parameterDesc")
+          )
+        ),
+         
+        tabPanel(
+          "About",
+          fluidPage(
+          br()
+          #includeMarkdown("About.Rmd")
+          )
+        )
+         
       ),
       width=7
     )
