@@ -3,66 +3,88 @@ title: "SEIR"
 output: html_notebook
 ---
 
-We use a compartmental epidemiological model, based on the classic SEIR model, to describe the spread and clinical progression of COVID-19. A nice primer to this sort of model is available on [Wikipedia](https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology).  It is important to track the different clinical outcomes of infection, since they require different level of healthcare resources to care for and may be tested and isolated at different rates. Susceptible ($S$) individuals who become infected start out in an exposed class $E$, where they are asymptomatic and do not transmit infection. The rate of progressing from the exposed stage to the infected stage $I$, where the individual is symptomatic and infectious, occurs at rate $a$. The clinical descriptions of the different stages of infection are given below. Infected individuals begin with *mild* infection ($I_1$), from which they either recover, at rate $\gamma_1$, or progress to *severe* infection ($I_2$), at rate $p_1$. Severe infection resolves at rate $\gamma_2$ or progresses to a critical stage ($I_3$) at rate $p_2$. Individuals with critical infection recover at rate $\gamma_3$ and die at rate $\mu$. Recovered individuals are tracked by class $R$ and are assumed to be protected from re-infection for life. Individuals may transmit the infection at any stage, though with different rates. The  transmission rate in stage $i$ is described by $\beta_i$ . 
+This model is build on top of a model by Alison Hill, which can be found [here](https://alhill.shinyapps.io/COVID19seir/). It is a compartmental model of the SIR variety ([Wikipedia](https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology)). I have drawn heavily on this [book](https://www.springer.com/gp/book/9783319974866).
+
+Individuals in this model are split up into $N$ age groups and 9 classes. All individuals start in the susceptible ($S$) class. Then they pass through two exposed class $E0$ and $E1$, where once in the second class they become infectious. Infected indivduals can be either asymptomatic ($I0$), mild ($I1$), severe ($I2$) or critical ($I3$). Alls of them can transmit the disease and all of them can either pass to the next stage or heal. Critical cases face a probability of dying and transitioning to the $D$ class. Recovered individuals transit to the $R$ class where they are immune. Optionally the user can specify a probability of losing immunity and transitioning back to the $S$ class. Thet transition dynamics are presented below:
+
+
+Individuals age at a rate ensuring they spend the correct time in their age bracket. In addition the user can specify a background non-epidemic death rate. In that case I also introduce a birth rate to keep the population constant. The death rate is the same across age groups in the dashboard (although in the source code it need not be) so it only serves to introduce a new flow of susceptibles and a possible endemic equilibrium.
+
+The system of differential equations that governs the system is given below:
  
 ### Equations
 
 \begin{equation}
-\dot{S} = -(\beta_1 I_1 -\beta_2 I_2 - \beta_3 I_3) S
+\dot{S^{i}} = -\beta_{e}\sum_{j \in N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) -\beta_{0}\sum_{j \in N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t)-\beta_{1}\sum_{j \in N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t)-\beta_{2}\sum_{j \in N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t)-\beta_{3}\sum_{j \in N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} \sigma(t) +\alpha^{i-1} S^{i-1} -\alpha^i S^i - \eta_{-}^{i} S + \eta_{+}^{i} \sum_{j \in N}n^i +\phi R^i \\
 \end{equation}
 
 \begin{equation}
-\dot{E} =(\beta_1 I_1 +\beta_2 I_2 + \beta_3 I_3) S - a E \\
+\dot{E_0^i} = \beta_{e}\sum_{j \in N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) +\beta_{0}\sum_{j \in N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t) + \beta_{1}\sum_{j \in N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t) + \beta_{2}\sum_{j \in N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t) + \beta_{3}\sum_{j \in N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} -\epsilon_0 E_0^i \sigma(t) +\alpha^{i-1} E_0^{i-1} -\alpha^i E_0^i - \eta_{-}^{i} E_0^i \\
 \end{equation}
 
 \begin{equation}
-\dot{I_1} = a E - (\gamma_1 + p_1) I_1 \\
+\dot{E_1^i} = \epsilon_0 E_0^i - \epsilon_1 E_1^i + \alpha^{i-1} E_1^{i-1} - \alpha^i E_1^i -\eta_{-}^{i}E_1^i \\
 \end{equation}
 
 \begin{equation}
-\dot{I_2} = p_1 I_1 -(\gamma_2 + p_2) I_2 \\
+\dot{I_0^i} = f\epsilon_1 E_1^i - \gamma_0 I_0^i + \alpha^{i-1} I_0^{i-1} - \alpha^i I_0^i -\eta_{-}^i I_0^i \\
 \end{equation}
 
 \begin{equation}
-\dot{I_3}  = p_2 I_2 -(\gamma_3 + \mu) I_3 \\
+\dot{I_1^i} = (1-f)\epsilon_1 E_1^i - \gamma_1 I_1^i - \theta_1 I_1^i + \alpha^{i-1} I_1^{i-1} - \alpha^i I_1^i -\eta_{-}^i I_1^i \\
 \end{equation}
 
 \begin{equation}
-\dot{R}  = \gamma_1 I_1 + \gamma_2 I_2 + \gamma_3 I_3 \\
+\dot{I_2^i} = \theta_1 I_1^i - \gamma_2 I_2^i - \theta_2 I_2^i + \alpha^{i-1} I_2^{i-1} - \alpha^i I_2^i -\eta_{-}^i I_2^i \\
 \end{equation}
 
 \begin{equation}
-\dot{D}  = \mu I_3
+\dot{I_3^i} = \theta_2 I_2^i - \gamma_3 I_3^i - \mu I_3^i + \alpha^{i-1} I_3^{i-1} - \alpha^i I_3^i -\eta_{-}^i I_3^i \\
 \end{equation}
 
+\begin{equation}
+\dot{R^i} = \gamma_1 I_1^i + \gamma_2 I_2^i + \gamma_3 I_3^i - \phi R^i + \alpha^{i-1} R^{i-1} - \alpha^i R^i -\eta_{-}^i R^i \\
+\end{equation}
+
+\begin{equation}
+\dot{D^i}  = \mu I^i_3 \\
+\end{equation}
 
 
 ### Variables
+All variables below are vectors of length $N$, where the $i$-th element represents the number of that class in the $i$-th age group.
 * $S$: Susceptible individuals
-* $E$: Exposed individuals - infected but not yet infectious or symptomatic
+* $E_0$: Exposed to the virus but not yet infectious or symptomatic
+* $E_1$: Exposed to the virust, already infectious but not yet symptomatic
+* $I_0$: Infected individuals with no symptoms. These individuals can pass the virus but they do not pass to the more critical categories and will always heal completely at some point.
 * $I_i$: Infected individuals in severity class $i$. Severity increases with $i$ and we assume individuals must pass through all previous classes
   * $I_1$: Mild infection 
   * $I_2$: Severe infection 
   * $I_3$: Critical infection 
 * $R$: individuals who have recovered from disease and are now immune
 * $D$: Dead individuals
-* $N=S+E+I_1+I_2+I_3+R+D$ Total population size (constant)
 
 ### Parameters
-* $\beta_i$ rate at which infected individuals in class $I_i$ contact susceptibles and infect them
-* $a$ rate of progression from the exposed to infected class
+* $\beta_e$ probability of infection given contact between individual of class $E_1$ and a susceptible individual.
+* $\beta_i$ probability of infection given contact between individual of class $I_i$ and a susceptible individual.
+* $w_{e}^{i,j}$ daily average number of contacts between an exposed individual of age group $i$ and age group $j$. The defintion for $w_0^{i,j}$, $w_1^{i,j}$, $w_2^{i,j}$, $w_3^{i,j}$. All these variables can be organised into matrices $W_e$, $W_0$, $W_1$, $W_2$, and $W_3$.
+* $\eta_{-}$ vector of per age outside probability of unrelated death (in this dashboard all elements are the same)
+* $\eta_{+}$ vector of birth rates. Everything except the first element is $0$ since all individuals are born in the first group
+* $\alpha$ vector of aging rates. We define $\alpha^0$ to be $0$, and $X^0$ to be $0$ for all vectors $X
+* $\epsilon_0$ probability of progression from class $E_0$ to $E_1$
+* $\epsilon_i$ probability of progression from $E_1$ to $I_0$ or $I_1$
+* $f$ fraction of progressed cases from $E1$ to $I_0$ (the complementary fraction $1-f$ progresses to $I_1$)
 * $\gamma_i$ rate at which infected individuals in class $I_i$ recover from disease and become immune
-* $p_i$ rate at which infected individuals in class $I_i$ progress to class $I_{i+1}$
+* $\theta_i$ rate at which infected individuals in class $I_i$ progress to class $I_{i+1}$
 * $\mu$ death rate for individuals in the most severe stage of disease
 
-All rates are per day.
+All probabilities and rates are per day.
 
 ### Clinical stages
 
-* Mild infection - These individuals have symptoms like fever and cough and may have mild pneumonia.  Hospitalization is not required (though in many countries such individuals are also hospitalized)
-* Severe infection - These individuals have more severe pneumonia that leads to dyspnea, respiratory frequency <30/min, blood oxygen saturation <93%, partial pressure of arterial oxygen to fraction of inspired oxygen ratio <300, and/or lung infiltrates >50% within 24 to 48 hours. Hospitalization and supplemental oxygen are generally required.
-* Critical infection - These individuals experience respiratory failure, septic shock, and/or multiple organ dysfunction or failure. Treatment in an ICU, often with mechanical ventilation, is required.
-
+* Mild infection - Hospitalization is not required (though in many countries such individuals are also hospitalized)
+* Severe infection - Hospitalization and supplemental oxygen are generally required.
+* Critical infection - Treatment in an ICU, often with mechanical ventilation, is required.
 
 ### Relating clinical observations to model parameters
 
@@ -82,60 +104,27 @@ To determine the model parameters consistent with current clinical data, we coll
 a=1/IncubPeriod
 
 g1=(1/DurMildInf)*FracMild
-p1=(1/DurMildInf)-g1
+theta1=(1/DurMildInf)-g1
 
-p2=(1/DurHosp)*(FracCritical/(FracSevere+FracCritical))
-g2=(1/DurHosp)-p2
+g2=(1/DurHosp)-theta2
+theta2=(1/DurHosp)*(FracCritical/(FracSevere+FracCritical))
 
-u=(1/TimeICUDeath)*(CFR/FracCritical)
-g3=(1/TimeICUDeath)-u
+mu=(1/TimeICUDeath)*(CFR/FracCritical)
+g3=(1/TimeICUDeath)-mu
 
+eta1=1/PresymPeriod
+eta0=(IncubPeriod-PresymPeriod)^(-1)
+f=FracAsym
+g0=1/DurAsym
+
+We = W
+W0 = W
+W1 = ContactFractionMild * W
+W2 = ContactFractionSevere * W
+W3 = ContactFractionCritical * W
 ```
 
-
-### Basic reproductive ratio
-
-Idea: $R_0$ is the sum of 
-
-1. the average number of secondary infections generated from an individual in stage $I_1$
-2. the probability that an infected individual progresses to $I_2$ multiplied by the average number of secondary infections generated from an individual in stage $I_2$
-3.  the probability that an infected individual progresses to $I_3$ multiplied by the average number of secondary infections generated from an individual in stage $I_3$
-
-\begin{equation}
-R_0  = N\frac{\beta_1}{p_1+\gamma_1} + \frac{p_1}{p_1 + \gamma_1} \left( \frac{N \beta_2}{p_2+\gamma_2} + \frac{p_2}{p_2 + \gamma_2} \frac{N \beta_3}{\mu+\gamma_3}\right)
-\end{equation}
-
-\begin{equation}
- = N\frac{1}{p_1+\gamma_1} \left(\beta_1 + \frac{p_1}{p_2 + \gamma_2} \left( \beta_2 +  \beta_3 \frac{p_2}{\mu + \gamma_3} \right) \right)
-\end{equation}
-
-Calculations using the next generation matrix give the same results. 
-
-### Early epidemic growth rate
-
-Early in the epidemic, before susceptibles are depleted, the epidemic grows at an exponential rate $r$, which can also be described with doubling time T$_2$=ln(2)$/r$. During this phase all infected classes grow at the same rate as each other and as the deaths and recovered individuals. The cumulative number of infections that have happened since the outbreak started also grows at the same rate. This rate can be calculated from the dominant eigenvalue of the linearized system of equations in the limit that $S=N$. 
-
-During this early exponential growth phase, there will be a fixed ratio of individuals between any pair of compartments. This expected ratio could be used to estimate the amount of underreporting in data. For example, we might think that all deaths are reported, but that some mild infections might not be reported, since these patients might not seek healthcare or might not be prioritized for testing. These ratios have expected values under the model for a fixed set of parameters. They can be calculated by finding the eigenvector corresponding to the dominant eigenvalue ($r$) for the linearized system described above. Ratios that deviate from these values suggest either a) underreporting of cases relative to deaths, or b) local differences in the clinical parameters of disease progression. The expected ratios are
-
-\begin{equation}
-\frac{I_3}{D} = \frac{r}{\mu}
-\end{equation}
-
-\begin{equation}
-\frac{I_2}{D} = \frac{(\mu+\gamma_3+r)}{p_2}\frac{r}{\mu}
-\end{equation}
-
-\begin{equation}
-\frac{I_1}{D} = \frac{(p_2+\gamma_2+r)}{p_1}\frac{(\mu+\gamma_3+r)}{p_2}\frac{r}{\mu}
-\end{equation}
-
-\begin{equation}
-\frac{\textrm{Total symptomatic}}{D} =_ \sum I_i = \frac{r}{\mu} \left[1 + \frac{(\mu+\gamma_3+r)}{p_2} \left(1+\frac{(p_2+\gamma_2+r)}{p_1} \right) \right]
-\end{equation}
-
-\begin{equation}
-\frac{E}{D} = \frac{(p_1+\gamma_1+r)}{a}\frac{(p_2+\gamma_2+r)}{p_1}\frac{(\mu+\gamma_3+r)}{p_2}\frac{r}{\mu}
-\end{equation}
+Where $W$ is the contact matrix of healthy individuals defined by the inputs in the contacts tab. I assume exposed and asymptomatics don't change their contact behavior, while infections of diferent severity only conduct a fraction of the contacts of healthy individuals due to being sick at home or in hospital. The fractions are defined by the user.
 
 ### Assumptions
 
@@ -143,72 +132,5 @@ During this early exponential growth phase, there will be a fixed ratio of indiv
 * Individuals must pass through a mild stage before reaching a severe or critical stage
 * Individuals must pass through a severe stage before reaching a critical stage
 * Only individuals in a critical stage die
-* All individuals have equal transmission rates and equal susceptiblity to infection
-
-### Updates
-
-#### Mar 21 2020
-
-* The model now includes the possibility for asymptomatic infection. After leaving the $E$ class, a fraction $f$ of individuals develop asymptomatic infection (enter $I_0$ class), whereas the remaining fraction $1-f$ develop symptomatic infection (enter $I_1$ class). Asymptomatic infection never progresses to more severe stages. The rate of recovery from asymptomatic infection is $\gamma_0$. Asymptomatically-infected individuals may transmit to others at rate $\beta_0$. The original sliders that control the fractions of infections that are mild vs severe vs critical now have the interpretation as being the fraction of _symptomatic_ infections that enter each of these stages. 
-* The model now also includes the possibility that exposed individuals who have not yet developed symptoms may still be able to transmit the virus ("presymptomatic transmission"). To model this, we divide the $E$ class into two separate classes, $E_0$ (no symptoms or transmission) and $E_1$ (no symptoms but can transmit). The rate of exit from $E_0$ is $a_0$ and from $E_1$ is $a_1$. 
-* We now include the option for seasonality in the tranmission rates. All transmission rates are modified by a factor $\sigma(t) = 1 + \epsilon \cos(2 \pi (t-\phi))$ where $\epsilon \in [0,1]$ is the relative amplitude of the seasonal oscillations and and $\phi \in [-\infty, \infty]$ is the phase, and determines the time (in years) of the peak in transmisison relative to the time the simulation starts. The values the user inputs for the transmisison rates are interpreted as the rates at time zero of the simulation. This input will be equal to the peak transmission if $\phi = 0$, as the minimum transmission of if $\phi=365/4 \sim 90$, and as the time-average transmission if $\phi=365/2 \sim 180$, for example. 
-
-The updated model equations are
-
-\begin{equation}
-\dot{S} = -(\beta_e E_1 + \beta_0 I_0 + \beta_1 I_1 +\beta_2 I_2 + \beta_3 I_3) S \sigma(t)
-\end{equation}
-
-\begin{equation}
-\dot{E_0} =(\beta_e E_1 + \beta_0 I_0 +\beta_1 I_1 +\beta_2 I_2 + \beta_3 I_3) S \sigma(t) - a_0 E_0 \\
-\end{equation}
-
-\begin{equation}
-\dot{E_1} = a_0 E_0 - a_1 E \\
-\end{equation}
-
-\begin{equation}
-\dot{I_0} = f a_1 E_1 - \gamma_0 I_0 \\
-\end{equation}
-
-\begin{equation}
-\dot{I_1} = (1-f) a_1 E_1 - (\gamma_1 + p_1) I_1 \\
-\end{equation}
-
-\begin{equation}
-\dot{I_2} = p_1 I_1 -(\gamma_2 + p_2) I_2 \\
-\end{equation}
-
-\begin{equation}
-\dot{I_3}  = p_2 I_2 -(\gamma_3 + \mu) I_3 \\
-\end{equation}
-
-\begin{equation}
-\dot{R}  = \gamma_0 I_0 + \gamma_1 I_1 + \gamma_2 I_2 + \gamma_3 I_3 \\
-\end{equation}
-
-\begin{equation}
-\dot{D}  = \mu I_3
-\end{equation}
-
-The extra slider inputs are
-
-* FracAsym: Fraction of all infections that are asymptomatic
-* PresymPeriod: Length of infectious phase of incubation period
-* DurAsym: Duration of asympatomatic infection
-
-And the formula for extracting the rate constants from these inputs are
-
-```{r}
-a1=1/PresymPeriod
-a0=(IncubPeriod-PresymPeriod)^(-1)
-f=FracAsym
-g0=1/DurAsym
-```
-
-The basic reproductive ratio becomes
-
-\begin{equation}
-R_0 = N \left[ \frac{\beta_e}{a_1} + f \frac{\beta_0}{\gamma_0} + (1-f) \frac{1}{p_1+\gamma_1} \left(\beta_1 + \frac{p_1}{p_2 + \gamma_2} \left( \beta_2 +  \beta_3 \frac{p_2}{\mu + \gamma_3} \right) \right) \right]
-\end{equation}
+* All individuals of a single age group have equal transmission rates and equal susceptiblity to infection
 

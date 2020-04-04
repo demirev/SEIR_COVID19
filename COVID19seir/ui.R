@@ -8,7 +8,7 @@ fluidPage(
   fluidRow(
     column(
       12,
-      p(div(HTML("Disclaimer: This dashboard is based on an excellent tool by Alison Hill which can be found at <a href=https://alhill.shinyapps.io/COVID19seir/> this address <\a>. As such it is also distributed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>. Changes made include the introduction of different age groups and contact matrices as well as the option for multiple interventions. All errors and omissions in the changes introduced in this version are my own."))),
+      p(div(HTML("Disclaimer: This dashboard is based on a tool by Alison Hill which can be found at <a href=https://alhill.shinyapps.io/COVID19seir/> this address <\a>. As such it is also distributed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>. Changes made include the introduction of different age groups and contact matrices as well as the option for multiple interventions. All errors and omissions in the changes introduced in this version are my own."))),
       offset = 0
     )
   ),
@@ -287,7 +287,7 @@ fluidPage(
               12,
               withMathJax(),
               h2("Model Description"),
-              #includeMarkdown("SEIR.Rmd"),
+              includeMarkdown("SEIR.Rmd"),
               br()
             )
           )
@@ -296,7 +296,8 @@ fluidPage(
         tabPanel(
           "Sources",
           fluidPage(
-            br()
+            br(),
+            h4("TODO")
             #uiOutput("parameterDesc")
           )
         ),
@@ -304,8 +305,8 @@ fluidPage(
         tabPanel(
           "About",
           fluidPage(
-          br()
-          #includeMarkdown("About.Rmd")
+          br(),
+          includeMarkdown("About.Rmd")
           )
         )
          
