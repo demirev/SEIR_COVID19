@@ -1,0 +1,30 @@
+---
+title: "Tutorial"
+output: html_notebook
+---
+
+# Defining policy interventions
+
+In order to examine the implied effects of different policy interventions switch over to the interventions tab.
+
+In this tab you can add multiple interventions of several different times that will all be applied to the model.
+
+To add an intervention, firts choose a name for it (the name does not need to be meaningful):
+![choose a name](images/tut1.png)
+
+After this clicke the 'plus' icon to add the intervention:
+![pres add](images/tut2.png)
+
+Fill in the type, duration and magnitude of the intervention:
+![fill in details](images/tut3.png)
+
+Click 'Save' for the intervention to take effect:
+![click save](images/tut4.png)
+
+You can then add a new intervention following the same steps. Both interventions will be in place once you click 'Save' on the second intervention. You can add up to 24 interventions in this version (though this can easily be expanded):
+![add other interventions](images/tut5.png)
+
+At any point you can remove an intervention by clicking the "X" button:
+![click X to remove](images/tut6.png)
+
+The two graphs on the Interventions tab show you the effect of the interventions. The top graph is the spread with no interventions (similar to the Spread tab), while the bottom graph is the spread after all defined interventions are taken into account.

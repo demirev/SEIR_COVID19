@@ -7,49 +7,32 @@ This model is build on top of a model by Alison Hill, which can be found [here](
 
 Individuals in this model are split up into $N$ age groups and 9 classes. All individuals start in the susceptible ($S$) class. Then they pass through two exposed class $E0$ and $E1$, where once in the second class they become infectious. Infected indivduals can be either asymptomatic ($I0$), mild ($I1$), severe ($I2$) or critical ($I3$). Alls of them can transmit the disease and all of them can either pass to the next stage or heal. Critical cases face a probability of dying and transitioning to the $D$ class. Recovered individuals transit to the $R$ class where they are immune. Optionally the user can specify a probability of losing immunity and transitioning back to the $S$ class. Thet transition dynamics are presented below:
 
+![transition diagram](images/flow1.png)
 
-Individuals age at a rate ensuring they spend the correct time in their age bracket. In addition the user can specify a background non-epidemic death rate. In that case I also introduce a birth rate to keep the population constant. The death rate is the same across age groups in the dashboard (although in the source code it need not be) so it only serves to introduce a new flow of susceptibles and a possible endemic equilibrium.
+Individuals age at a rate ensuring they spend the correct time in their age bracket. The aging rate for age bracket $i$ is defined as $1$ over the length of the bracket (and $0$ for the oldest bracket). In addition the user can specify a background non-epidemic death rate. In that case I also introduce a birth rate to keep the population constant. The death rate is the same across age groups in the dashboard (although in the source code it need not be) so it only serves to introduce a new flow of susceptibles and a possible endemic equilibrium.
 
-The system of differential equations that governs the system is given below:
+![aging diagram](images/flow2.png)
+
+The differential equations that governs the system are given below:
  
 ### Equations
+* $\dot{S^{i}} = -\beta_{e}\sum_{j \in 1:N}w^{i,j}_e E_1^j \frac{S^i}{n^i} \sigma(t) -\beta_{0}\sum_{j \in 1:N}w^{i,j}_0 I_0^j \frac{S^i}{n^i} \sigma(t)-\beta_{1}\sum_{j \in 1:N}w^{i,j}_1 I_1^j \frac{S^i}{n^i} \sigma(t)-\beta_{2}\sum_{j \in 1:N}w^{i,j}_2 I_2^j \frac{S^i}{n^i} \sigma(t)-\beta_{3}\sum_{j \in 1:N}w^{i,j}_3 I_3^j \frac{S^i}{n^i} \sigma(t) +\alpha^{i-1} S^{i-1} -\alpha^i S^i - \eta_{-}^{i} S + \eta_{+}^{i} \sum_{j \in 1:N}n^i +\phi R^i$
 
-\begin{equation}
-\dot{S^{i}} = -\beta_{e}\sum_{j \in N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) -\beta_{0}\sum_{j \in N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t)-\beta_{1}\sum_{j \in N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t)-\beta_{2}\sum_{j \in N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t)-\beta_{3}\sum_{j \in N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} \sigma(t) +\alpha^{i-1} S^{i-1} -\alpha^i S^i - \eta_{-}^{i} S + \eta_{+}^{i} \sum_{j \in N}n^i +\phi R^i \\
-\end{equation}
+* $\dot{E_0^i} = \beta_{e}\sum_{j \in 1:N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) +\beta_{0}\sum_{j \in 1:N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t) + \beta_{1}\sum_{j \in 1:N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t) + \beta_{2}\sum_{j \in 1:N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t) + \beta_{3}\sum_{j \in 1:N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} -\epsilon_0 E_0^i \sigma(t) +\alpha^{i-1} E_0^{i-1} -\alpha^i E_0^i - \eta_{-}^{i} E_0^i$
 
-\begin{equation}
-\dot{E_0^i} = \beta_{e}\sum_{j \in N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) +\beta_{0}\sum_{j \in N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t) + \beta_{1}\sum_{j \in N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t) + \beta_{2}\sum_{j \in N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t) + \beta_{3}\sum_{j \in N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} -\epsilon_0 E_0^i \sigma(t) +\alpha^{i-1} E_0^{i-1} -\alpha^i E_0^i - \eta_{-}^{i} E_0^i \\
-\end{equation}
+* $\dot{E_1^i} = \epsilon_0 E_0^i - \epsilon_1 E_1^i + \alpha^{i-1} E_1^{i-1} - \alpha^i E_1^i -\eta_{-}^{i}E_1^i$
 
-\begin{equation}
-\dot{E_1^i} = \epsilon_0 E_0^i - \epsilon_1 E_1^i + \alpha^{i-1} E_1^{i-1} - \alpha^i E_1^i -\eta_{-}^{i}E_1^i \\
-\end{equation}
+* $\dot{I_0^i} = f\epsilon_1 E_1^i - \gamma_0 I_0^i + \alpha^{i-1} I_0^{i-1} - \alpha^i I_0^i -\eta_{-}^i I_0^i$
 
-\begin{equation}
-\dot{I_0^i} = f\epsilon_1 E_1^i - \gamma_0 I_0^i + \alpha^{i-1} I_0^{i-1} - \alpha^i I_0^i -\eta_{-}^i I_0^i \\
-\end{equation}
+* $\dot{I_1^i} = (1-f)\epsilon_1 E_1^i - \gamma_1 I_1^i - \theta_1 I_1^i + \alpha^{i-1} I_1^{i-1} - \alpha^i I_1^i -\eta_{-}^i I_1^i$
 
-\begin{equation}
-\dot{I_1^i} = (1-f)\epsilon_1 E_1^i - \gamma_1 I_1^i - \theta_1 I_1^i + \alpha^{i-1} I_1^{i-1} - \alpha^i I_1^i -\eta_{-}^i I_1^i \\
-\end{equation}
+* $\dot{I_2^i} = \theta_1 I_1^i - \gamma_2 I_2^i - \theta_2 I_2^i + \alpha^{i-1} I_2^{i-1} - \alpha^i I_2^i -\eta_{-}^i I_2^i$
 
-\begin{equation}
-\dot{I_2^i} = \theta_1 I_1^i - \gamma_2 I_2^i - \theta_2 I_2^i + \alpha^{i-1} I_2^{i-1} - \alpha^i I_2^i -\eta_{-}^i I_2^i \\
-\end{equation}
+* $\dot{I_3^i} = \theta_2 I_2^i - \gamma_3 I_3^i - \mu I_3^i + \alpha^{i-1} I_3^{i-1} - \alpha^i I_3^i -\eta_{-}^i I_3^i$
 
-\begin{equation}
-\dot{I_3^i} = \theta_2 I_2^i - \gamma_3 I_3^i - \mu I_3^i + \alpha^{i-1} I_3^{i-1} - \alpha^i I_3^i -\eta_{-}^i I_3^i \\
-\end{equation}
+* $\dot{R^i} = \gamma_1 I_1^i + \gamma_2 I_2^i + \gamma_3 I_3^i - \phi R^i + \alpha^{i-1} R^{i-1} - \alpha^i R^i -\eta_{-}^i R^i$
 
-\begin{equation}
-\dot{R^i} = \gamma_1 I_1^i + \gamma_2 I_2^i + \gamma_3 I_3^i - \phi R^i + \alpha^{i-1} R^{i-1} - \alpha^i R^i -\eta_{-}^i R^i \\
-\end{equation}
-
-\begin{equation}
-\dot{D^i}  = \mu I^i_3 \\
-\end{equation}
-
+* $\dot{D^i}  = \mu I^i_3$
 
 ### Variables
 All variables below are vectors of length $N$, where the $i$-th element represents the number of that class in the $i$-th age group.
@@ -64,6 +47,8 @@ All variables below are vectors of length $N$, where the $i$-th element represen
 * $R$: individuals who have recovered from disease and are now immune
 * $D$: Dead individuals
 
+Where $i$ takes values in $1:N$. Dotted variables denote time derivatives.
+
 ### Parameters
 * $\beta_e$ probability of infection given contact between individual of class $E_1$ and a susceptible individual.
 * $\beta_i$ probability of infection given contact between individual of class $I_i$ and a susceptible individual.
@@ -77,6 +62,7 @@ All variables below are vectors of length $N$, where the $i$-th element represen
 * $\gamma_i$ rate at which infected individuals in class $I_i$ recover from disease and become immune
 * $\theta_i$ rate at which infected individuals in class $I_i$ progress to class $I_{i+1}$
 * $\mu$ death rate for individuals in the most severe stage of disease
+* $\sigma(t)$: Seasonal multiplier at time $t$.
 
 All probabilities and rates are per day.
 

@@ -9,6 +9,8 @@ library(tidyr)
 source("code/functions.R")
 source("code/functions_age.R")
 
+
+# define per age contact rates --------------------------------------------
 ageBounds = c(
   4, 7, 12, 18, 25, 30, 40, 50, 65, 75, 85, 100
 )
@@ -29,6 +31,8 @@ rownames(ageContactMatrix) <- colnames(ageContactMatrix)
 
 ageBounds <- as.numeric(rownames(ageContactMatrix))
 
+
+# create a tibble of all interventions using the generator functions --------
 interventions <- bind_rows(
   #setIntervention(30, 60, intervenePercentGenerator, 'b1', 0.2),
   #setIntervention(20, 40, interveneConstantGenerator, 'g2', 0.1),
@@ -43,6 +47,8 @@ interventions <- bind_rows(
   )
 )
 
+
+# solve with no interventions ---------------------------------------------
 resDfBase <- simInterventionsAge(
   interventions = tibble(),
   IncubPeriod= 5, #Duration of incubation period
@@ -84,6 +90,8 @@ resDfBase <- simInterventionsAge(
   CritContacts = 0.01 * ageContactMatrix
 )
 
+
+# solve with the interventions --------------------------------------------
 resDfInt <- simInterventionsAge(
   interventions = interventions,
   IncubPeriod= 5, #Duration of incubation period
@@ -125,6 +133,8 @@ resDfInt <- simInterventionsAge(
   CritContacts = 0.01 * ageContactMatrix
 )
 
+
+# some example plots ------------------------------------------------------
 plotSimAggregate(resDfBase, usePlotly = F)
 plotSimAggregate(resDfInt, usePlotly = F)
 

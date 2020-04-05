@@ -293,6 +293,10 @@ function(input, output, session) {
     )
   })
   
+  plotIandEMax <- reactive({
+    getMaxValEandI(resultBase())
+  })
+  
   output$plotBase <- renderPlotly({
     plotSimAggregate(resultBase())
   })
@@ -307,10 +311,10 @@ function(input, output, session) {
     plotSimEandI(resultBase())
   })
   output$plotEandIBaseInttab <- renderPlotly({
-    plotSimEandI(resultBase())
+    plotSimEandI(resultBase(), maxY = plotIandEMax() * 1.05)
   })
   output$plotEandIIntInttab <- renderPlotly({
-    plotSimEandI(resultInterventions())
+    plotSimEandI(resultInterventions(), maxY = plotIandEMax() * 1.05)
   })
   
   output$plotAge <- renderPlotly({
@@ -363,6 +367,7 @@ function(input, output, session) {
   #dynamically add UI inputs based on button clicks
   interventionHeaders <- reactive({
     n <- countIntrv$n
+    selectedIntrv$which <- n
     if (n > 0){
       lapply(seq_len(n), function(i) {
         fluidRow(
@@ -392,6 +397,7 @@ function(input, output, session) {
   #dynamically change selected block box
   interventionInputs <- reactive({
     id <- selectedIntrv$which
+    hasInfo <- if (id == 0) F else !is.null(interventionInfo$intrv[[id]]$inttype)
     if (id != 0){
       shinydashboard::box(
         title = interventionInfo$intrv[[id]]$name,
@@ -407,19 +413,19 @@ function(input, output, session) {
               "Restrict Contacts Between Two Age Brackets" = "ageForAge",
               "Decrease Probability of infection regardless of contact frequency" = "coef"
             ), 
-            selected = interventionInfo$intrv[[id]]$inttype
+            selected = if (hasInfo) interventionInfo$intrv[[id]]$inttype else "allContacts"
           ),
           numericInput(
             "intstart", 
             "Intervention starts on day", 
-            value = interventionInfo$intrv[[id]]$intstart, 
-            min = 0, max = 3000
+            value = if (hasInfo) interventionInfo$intrv[[id]]$intstart else 0,
+            min = 0, max = round(0.9 * input$Tmax)
           ),
           numericInput(
             "intend", 
             "Intervention ends on day", 
-            value = interventionInfo$intrv[[id]]$intend,
-            min = 0, max = 3000
+            value = if (hasInfo) interventionInfo$intrv[[id]]$intend else 0,
+            min = 0, max = round(0.9 * input$Tmax)
           )
         ),
         column(

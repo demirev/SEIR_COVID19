@@ -5,6 +5,6 @@ output: html_notebook
 
 Based on a dashboard by [Alison Hill](https://twitter.com/alison_l_hill) and team which can be found at https://alhill.shinyapps.io/COVID19seir/ and on [Github](https://github.com/alsnhll/SEIR_COVID19).
 
-The code for this version is in branch `agedep` in this [repo](https://github.com/demirev/SEIR_COVID19/tree/agedep).
+The code for this version is in branch `agedep` of this [repo](https://github.com/demirev/SEIR_COVID19/tree/agedep).
 
-This version is developed by [Georgi Demirev](https://www.linkedin.com/in/gdemirev/) who you can contact with questions <georgi_demirev@protonmail.com>. 
+This version is developed by [Georgi Demirev](https://www.linkedin.com/in/gdemirev/) who you can contact at georgi_demirev@protonmail.com. 

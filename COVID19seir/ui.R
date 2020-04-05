@@ -8,7 +8,7 @@ fluidPage(
   fluidRow(
     column(
       12,
-      p(div(HTML("Disclaimer: This dashboard is based on a tool by Alison Hill which can be found at <a href=https://alhill.shinyapps.io/COVID19seir/> this address <\a>. As such it is also distributed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>. Changes made include the introduction of different age groups and contact matrices as well as the option for multiple interventions. All errors and omissions in the changes introduced in this version are my own."))),
+      p(div(HTML("Disclaimer: This dashboard is based on a tool by Alison Hill which can be found at <a href=https://alhill.shinyapps.io/COVID19seir/> this address </a>. As such it is also distributed under a <a href=https://creativecommons.org/licenses/by-sa/4.0/> Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License </a>. Changes made include the introduction of different age groups and contact matrices as well as the option for multiple interventions. All errors and omissions in the changes introduced in this version are my own."))),
       offset = 0
     )
   ),
@@ -200,7 +200,7 @@ fluidPage(
           fluidPage(
             fluidRow(
               h3("Reduction in predicted infections after interventions"),
-              p(HTML("Simulate the change in the time course of cases after applying a set of interventions")),
+              p(HTML("Simulate the change in the time course of cases after applying a set of interventions. See the Tutorial tab for instructions.")),
               br(),
               h4("Define Interventions"),
               fluidRow(
@@ -297,7 +297,8 @@ fluidPage(
           "Sources",
           fluidPage(
             br(),
-            h4("TODO")
+            h4("TODO: This page will contain all sources used for choosing the default parameters once I have collected them."),
+            h4("If you have any sources on infection severity for COVID19 by age group or probability of infection given close contact please send them to me using the email in the About section")
             #uiOutput("parameterDesc")
           )
         ),
@@ -307,6 +308,14 @@ fluidPage(
           fluidPage(
           br(),
           includeMarkdown("About.Rmd")
+          )
+        ),
+        
+        tabPanel(
+          "Tutorial",
+          fluidPage(
+            br(),
+            includeMarkdown("Tutorial.Rmd")
           )
         )
          
