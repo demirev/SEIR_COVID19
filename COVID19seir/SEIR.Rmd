@@ -5,7 +5,7 @@ output: html_notebook
 
 This model is build on top of a model by Alison Hill, which can be found [here](https://alhill.shinyapps.io/COVID19seir/). It is a compartmental model of the SIR variety ([Wikipedia](https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology)). I have drawn heavily on this [book](https://www.springer.com/gp/book/9783319974866).
 
-Individuals in this model are split up into $N$ age groups and 9 classes. All individuals start in the susceptible ($S$) class. Then they pass through two exposed class $E0$ and $E1$, where once in the second class they become infectious. Infected indivduals can be either asymptomatic ($I0$), mild ($I1$), severe ($I2$) or critical ($I3$). Alls of them can transmit the disease and all of them can either pass to the next stage or heal. Critical cases face a probability of dying and transitioning to the $D$ class. Recovered individuals transit to the $R$ class where they are immune. Optionally the user can specify a probability of losing immunity and transitioning back to the $S$ class. Thet transition dynamics are presented below:
+Individuals in this model are split up into $A$ age groups and 9 classes. All individuals start in the susceptible ($S$) class. Then they pass through two exposed class $E0$ and $E1$, where once in the second class they become infectious. Infected indivduals can be either asymptomatic ($I0$), mild ($I1$), severe ($I2$) or critical ($I3$). Alls of them can transmit the disease and all of them can either pass to the next stage or heal. Critical cases face a probability of dying and transitioning to the $D$ class. Recovered individuals transit to the $R$ class where they are immune. Optionally the user can specify a probability of losing immunity and transitioning back to the $S$ class. Thet transition dynamics are presented below:
 
 ![transition diagram](images/flow1.png)
 
@@ -16,9 +16,9 @@ Individuals age at a rate ensuring they spend the correct time in their age brac
 The differential equations that governs the system are given below:
  
 ### Equations
-* $\dot{S^{i}} = -\beta_{e}\sum_{j \in 1:N}w^{i,j}_e E_1^j \frac{S^i}{n^i} \sigma(t) -\beta_{0}\sum_{j \in 1:N}w^{i,j}_0 I_0^j \frac{S^i}{n^i} \sigma(t)-\beta_{1}\sum_{j \in 1:N}w^{i,j}_1 I_1^j \frac{S^i}{n^i} \sigma(t)-\beta_{2}\sum_{j \in 1:N}w^{i,j}_2 I_2^j \frac{S^i}{n^i} \sigma(t)-\beta_{3}\sum_{j \in 1:N}w^{i,j}_3 I_3^j \frac{S^i}{n^i} \sigma(t) +\alpha^{i-1} S^{i-1} -\alpha^i S^i - \eta_{-}^{i} S + \eta_{+}^{i} \sum_{j \in 1:N}n^i +\phi R^i$
+* $\dot{S^{i}} = -\beta_{e}\sum_{j \in 1:A}w^{i,j}_e E_1^j \frac{S^i}{n^i} \sigma(t) -\beta_{0}\sum_{j \in 1:A}w^{i,j}_0 I_0^j \frac{S^i}{n^i} \sigma(t)-\beta_{1}\sum_{j \in 1:A}w^{i,j}_1 I_1^j \frac{S^i}{n^i} \sigma(t)-\beta_{2}\sum_{j \in 1:A}w^{i,j}_2 I_2^j \frac{S^i}{n^i} \sigma(t)-\beta_{3}\sum_{j \in 1:A}w^{i,j}_3 I_3^j \frac{S^i}{n^i} \sigma(t) +\alpha^{i-1} S^{i-1} -\alpha^i S^i - \eta_{-}^{i} S + \eta_{+}^{i} \sum_{j \in 1:A}n^i +\phi R^i$
 
-* $\dot{E_0^i} = \beta_{e}\sum_{j \in 1:N}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) +\beta_{0}\sum_{j \in 1:N}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t) + \beta_{1}\sum_{j \in 1:N}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t) + \beta_{2}\sum_{j \in 1:N}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t) + \beta_{3}\sum_{j \in 1:N}w^{i,j}_3 I_3^i \frac{S^i}{n^i} -\epsilon_0 E_0^i \sigma(t) +\alpha^{i-1} E_0^{i-1} -\alpha^i E_0^i - \eta_{-}^{i} E_0^i$
+* $\dot{E_0^i} = \beta_{e}\sum_{j \in 1:A}w^{i,j}_e E_1^i \frac{S^i}{n^i} \sigma(t) +\beta_{0}\sum_{j \in 1:A}w^{i,j}_0 I_0^i \frac{S^i}{n^i} \sigma(t) + \beta_{1}\sum_{j \in 1:A}w^{i,j}_1 I_1^i \frac{S^i}{n^i} \sigma(t) + \beta_{2}\sum_{j \in 1:A}w^{i,j}_2 I_2^i \frac{S^i}{n^i} \sigma(t) + \beta_{3}\sum_{j \in 1:A}w^{i,j}_3 I_3^i \frac{S^i}{n^i} -\epsilon_0 E_0^i \sigma(t) +\alpha^{i-1} E_0^{i-1} -\alpha^i E_0^i - \eta_{-}^{i} E_0^i$
 
 * $\dot{E_1^i} = \epsilon_0 E_0^i - \epsilon_1 E_1^i + \alpha^{i-1} E_1^{i-1} - \alpha^i E_1^i -\eta_{-}^{i}E_1^i$
 
@@ -34,8 +34,10 @@ The differential equations that governs the system are given below:
 
 * $\dot{D^i}  = \mu I^i_3$
 
+Where $i$ takes values in $1:A$ (i.e. one for each age group). Dotted values denote time derivatives.
+
 ### Variables
-All variables below are vectors of length $N$, where the $i$-th element represents the number of that class in the $i$-th age group.
+All variables below are vectors of length $A$, where the $i$-th element represents the number of that class in the $i$-th age group.
 * $S$: Susceptible individuals
 * $E_0$: Exposed to the virus but not yet infectious or symptomatic
 * $E_1$: Exposed to the virust, already infectious but not yet symptomatic
@@ -47,7 +49,6 @@ All variables below are vectors of length $N$, where the $i$-th element represen
 * $R$: individuals who have recovered from disease and are now immune
 * $D$: Dead individuals
 
-Where $i$ takes values in $1:N$. Dotted variables denote time derivatives.
 
 ### Parameters
 * $\beta_e$ probability of infection given contact between individual of class $E_1$ and a susceptible individual.

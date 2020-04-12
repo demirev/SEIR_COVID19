@@ -1,0 +1,18 @@
+---
+title: "Sources"
+output: html_notebook
+---
+
+Data for the population distribution by age is meant to approximate the population of Bulgaria, and is taken from [populationpyramid.net](https://images.populationpyramid.net/capture/?selector=%23pyramid-share-container&url=https%3A%2F%2Fwww.populationpyramid.net%2Fbulgaria%2F2017%2F%3Fshare%3Dtrue)
+
+Data for per-age breakdown of mild, critical and severe cases is take from [the CDC Covid Response team](https://www.cdc.gov/mmwr/volumes/69/wr/pdfs/mm6912e2-H.pdf)
+
+Data for probability of transmission given close contact is taken from [Lei et al](https://www.medrxiv.org/content/10.1101/2020.03.24.20042606v1)
+
+Data for per-age contact rate is taken from the Mossong study, and can be derived by using the `getMossongData` function in the source code of this app (check the github link in the *About* page).
+
+Default values for the contact rate for mild, severe, and critical cases are arbitrary. Same goes for % of assymptomatic cases (I have seen too many divergent studies for this one and was unable to chose one) and number of initial infections (here I simulate an open country where the majority of early cases are imported). 
+
+The contact rate reduction for infected individuals may seem low, but this goes to reflect that they still maintain contacts with members of their household, who are the most likely to be infected in the first place.
+
+Other default values mostly follow Alison Hill's dashboard linked above.

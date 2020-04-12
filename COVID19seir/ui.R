@@ -31,7 +31,7 @@ fluidPage(
           #htmlOutput("N"),
           column(
             width=12,
-            numericInput("InitInf","Initial # infected per age group:",value = 1, min = 1, step = 1)
+            numericInput("InitInf","Initial # infected per age group:",value = 3, min = 1, step = 1)
           ),
           sliderInput("Tmax", div(HTML("Maximum time")),100, 3000, 1000, step=10, post=" days"),
           br(),
@@ -46,20 +46,20 @@ fluidPage(
           "Transmission Paramters",
         
           h4(div(HTML("<em>Set probability of transmission...</em>"))),
-          sliderInput("b1", div(HTML("Probability of transmission after contact with mild infections")), 0, 1, 0.05, step=0.01, post=""),
-          sliderInput("b2", div(HTML("Probability of transmission after contact with severe infections")),0, 1, 0.2, step=0.01, post=""),
-          sliderInput("b3", div(HTML("Probability of transmission after contact with critical infections")),0, 1, 0.4, step=0.01, post=""),
-          sliderInput("SocConMild", "Social contacts of mild cases relative to healthy individuals", 0, 1, 0.3, step=0.01),
-          sliderInput("SocConSevere", "Social contacts of severe cases relative to healthy individuals", 0, 1, 0.1, step=0.01),
-          sliderInput("SocConCritical", "Social contacts of critical cases relative to healthy individuals", 0, 1, 0.02, step=0.01),
+          sliderInput("b1", div(HTML("Probability of transmission after contact with mild infections")), 0, 1, 0.033, step=0.001, post=""), # source: https://www.medrxiv.org/content/10.1101/2020.03.24.20042606v1
+          sliderInput("b2", div(HTML("Probability of transmission after contact with severe infections")),0, 1, 0.062, step=0.001, post=""), # source: https://www.medrxiv.org/content/10.1101/2020.03.24.20042606v1
+          sliderInput("b3", div(HTML("Probability of transmission after contact with critical infections")),0, 1, 0.062, step=0.001, post=""), # source: https://www.medrxiv.org/content/10.1101/2020.03.24.20042606v1
+          sliderInput("SocConMild", "Social contacts of mild cases relative to healthy individuals", 0, 1, 0.8, step=0.01),
+          sliderInput("SocConSevere", "Social contacts of severe cases relative to healthy individuals", 0, 1, 0.3, step=0.01),
+          sliderInput("SocConCritical", "Social contacts of critical cases relative to healthy individuals", 0, 1, 0.1, step=0.01),
           sliderInput("LoseImunity", "Daily probability of losing immunity for recovered cases", 0, 1, 0.0, step=0.01),
           radioButtons("AllowAsym", "Allow asymptomatic infections?",
                        choices = list("Yes" = "Yes","No" = "No"),inline=TRUE,selected="Yes"),
           conditionalPanel(
             condition="input.AllowAsym == 'Yes'",
-            sliderInput("FracAsym", "% of infections that are asymptomatic", 0, 1, 0.3, step=0.01, pre=),
+            sliderInput("FracAsym", "% of infections that are asymptomatic", 0, 1, 0.2, step=0.01, pre=),
             sliderInput("DurAsym", "Duration of asymptomatic infections", 1, 20, 6, step=1, post = " days"),
-            sliderInput("b0", div(HTML("Asymptomatic transmission probability")), 0, 1, 0.03, step=0.01, post="")
+            sliderInput("b0", div(HTML("Asymptomatic transmission probability")), 0, 1, 0.0033, step=0.001, post="")  # source: https://www.medrxiv.org/content/10.1101/2020.03.24.20042606v1
           ),
           radioButtons(
             "AllowPresym", "Allow pre-symptomatic transmission?",
@@ -68,7 +68,7 @@ fluidPage(
           conditionalPanel(
             condition="input.AllowPresym == 'Yes'",
             sliderInput("PresymPeriod", "Time before symptom onset at which transmission is possible", 0, 3, 2, step=0.5, post = " days"), #Make reactive
-            sliderInput("be", div(HTML("Presymptomatic transmission probability")),0, 1, 0.03, step=0.01, post="")
+            sliderInput("be", div(HTML("Presymptomatic transmission probability")),0, 1, 0.0033, step=0.001, post="")
           ),
           radioButtons("AllowSeason", "Allow seasonality in transmission?",
                        choices = list("Yes" = "Yes","No" = "No"),inline=TRUE, selected="Yes"),
@@ -92,50 +92,50 @@ fluidPage(
           numericInput("N9", div(HTML("Population 66 - 75:")), value=824867, max=10^10, min=1000, step=1000),
           numericInput("N10", div(HTML("Population 76 - 85:")), value=435116, max=10^10, min=1000, step=1000),
           numericInput("N11", div(HTML("Population > 85:")), value=117696, max=10^10, min=1000, step=1000)
-        ),
+        ), # source: https://images.populationpyramid.net/capture/?selector=%23pyramid-share-container&url=https%3A%2F%2Fwww.populationpyramid.net%2Fbulgaria%2F2017%2F%3Fshare%3Dtrue
         tabPanel(
           "Severe Infections Per Age Group",
-          sliderInput("FracSevere1", "% of infections that are severe < 4", 0, 1, 0.001, step=.01),
-          sliderInput("FracSevere2", "% of infections that are severe 4 - 7", 0, 1, 0.002, step=.01),
-          sliderInput("FracSevere3", "% of infections that are severe 8 - 12", 0, 1, 0.005, step=.01),
-          sliderInput("FracSevere4", "% of infections that are severe 13 - 18", 0, 1, 0.01, step=.01),
-          sliderInput("FracSevere5", "% of infections that are severe 19 - 35", 0, 1, 0.02, step=.01),
-          sliderInput("FracSevere6", "% of infections that are severe 36 - 50", 0, 1, 0.04, step=.01),
-          sliderInput("FracSevere7", "% of infections that are severe 51 - 65", 0, 1, 0.08, step=.01),
-          sliderInput("FracSevere8", "% of infections that are severe 66 - 75", 0, 1, 0.15, step=.01),
-          sliderInput("FracSevere9", "% of infections that are severe 76 - 85", 0, 1, 0.20, step=.01),
-          sliderInput("FracSevere10", "% of infections that are severe 76 - 85", 0, 1, 0.25, step=.01),
-          sliderInput("FracSevere11", "% of infections that are severe > 85", 0, 1, 0.35, step=.01)
-        ),
+          sliderInput("FracSevere1", "% of infections that are severe < 4", 0, 1, 0.0205, step=.01),
+          sliderInput("FracSevere2", "% of infections that are severe 4 - 7", 0, 1, 0.0205, step=.01),
+          sliderInput("FracSevere3", "% of infections that are severe 8 - 12", 0, 1, 0.0205, step=.01),
+          sliderInput("FracSevere4", "% of infections that are severe 13 - 18", 0, 1, 0.0205, step=.01),
+          sliderInput("FracSevere5", "% of infections that are severe 19 - 25", 0, 1, 0.1534, step=.01),
+          sliderInput("FracSevere6", "% of infections that are severe 26 - 35", 0, 1, 0.1755, step=.01),
+          sliderInput("FracSevere7", "% of infections that are severe 36 - 50", 0, 1, 0.2043, step=.01),
+          sliderInput("FracSevere8", "% of infections that are severe 51 - 65", 0, 1, 0.2587, step=.01),
+          sliderInput("FracSevere9", "% of infections that are severe 66 - 75", 0, 1, 0.3691, step=.01),
+          sliderInput("FracSevere10", "% of infections that are severe 76 - 85", 0, 1, 0.446, step=.01),
+          sliderInput("FracSevere11", "% of infections that are severe > 85", 0, 1, 0.508, step=.01)
+        ), # source: https://www.cdc.gov/mmwr/volumes/69/wr/pdfs/mm6912e2-H.pdf
         tabPanel(
           "Critical Infections Per Age Group",
           sliderInput("FracCritical1", "% of infections that are critical < 4", 0, 1, 0.0001, step=.01),
-          sliderInput("FracCritical2", "% of infections that are critical 4 - 7", 0, 1, 0.0002, step=.01),
-          sliderInput("FracCritical3", "% of infections that are critical 8 - 12", 0, 1, 0.0005, step=.01),
-          sliderInput("FracCritical4", "% of infections that are critical 13 - 18", 0, 1, 0.001, step=.01),
-          sliderInput("FracCritical5", "% of infections that are critical 19 - 35", 0, 1, 0.002, step=.01),
-          sliderInput("FracCritical6", "% of infections that are critical 36 - 50", 0, 1, 0.01, step=.01),
-          sliderInput("FracCritical7", "% of infections that are critical 51 - 65", 0, 1, 0.04, step=.01),
-          sliderInput("FracCritical8", "% of infections that are critical 66 - 75", 0, 1, 0.07, step=.01),
-          sliderInput("FracCritical9", "% of infections that are critical 76 - 85", 0, 1, 0.10, step=.01),
-          sliderInput("FracCritical10", "% of infections that are critical 76 - 85", 0, 1, 0.15, step=.01),
-          sliderInput("FracCritical11", "% of infections that are critical > 85", 0, 1, 0.20, step=.01)
-        ),
+          sliderInput("FracCritical2", "% of infections that are critical 4 - 7", 0, 1, 0.0001, step=.01),
+          sliderInput("FracCritical3", "% of infections that are critical 8 - 12", 0, 1, 0.0001, step=.01),
+          sliderInput("FracCritical4", "% of infections that are critical 13 - 18", 0, 1, 0.0001, step=.01),
+          sliderInput("FracCritical5", "% of infections that are critical 19 - 25", 0, 1, 0.0266, step=.01),
+          sliderInput("FracCritical6", "% of infections that are critical 26 - 35", 0, 1, 0.031, step=.01),
+          sliderInput("FracCritical7", "% of infections that are critical 36 - 50", 0, 1, 0.0502, step=.01),
+          sliderInput("FracCritical8", "% of infections that are critical 51 - 65", 0, 1, 0.0830, step=.01),
+          sliderInput("FracCritical9", "% of infections that are critical 66 - 75", 0, 1, 0.1418, step=.01),
+          sliderInput("FracCritical10", "% of infections that are critical 76 - 85", 0, 1, 0.2075, step=.01),
+          sliderInput("FracCritical11", "% of infections that are critical > 85", 0, 1, 0.2075, step=.01)
+        ), # source: https://www.cdc.gov/mmwr/volumes/69/wr/pdfs/mm6912e2-H.pdf
         tabPanel(
           "Death Rate of Critical Infections Per Age Group",
           h4(div(HTML("<em>Change probability of lethal outcome of critical casess...</em>"))),
-          sliderInput("ProbDeath1", "Death probability for critical infections < 4", 0, 1, 0.3, step=.01),
-          sliderInput("ProbDeath2", "Death probability for critical infections 4 - 7", 0, 1, 0.2, step=.01),
-          sliderInput("ProbDeath3", "Death probability for critical infections 8 - 12", 0, 1, 0.1, step=.01),
-          sliderInput("ProbDeath4", "Death probability for critical infections 13 - 18", 0, 1, 0.05, step=.01),
-          sliderInput("ProbDeath5", "Death probability for critical infections 19 - 35", 0, 1, 0.1, step=.01),
-          sliderInput("ProbDeath6", "Death probability for critical infections 36 - 50", 0, 1, 0.2, step=.01),
-          sliderInput("ProbDeath7", "Death probability for critical infections 51 - 65", 0, 1, 0.3, step=.01),
-          sliderInput("ProbDeath8", "Death probability for critical infections 66 - 75", 0, 1, 0.4, step=.01),
-          sliderInput("ProbDeath9", "Death probability for critical infections 76 - 85", 0, 1, 0.5, step=.01),
-          sliderInput("ProbDeath10", "Death probability for critical infections 76 - 85", 0, 1, 0.6, step=.01),
-          sliderInput("ProbDeath11", "Death probability for critical infections > 85", 0, 1, 0.7, step=.01)
-        ),
+          sliderInput("ProbDeath1", "Death probability for critical infections < 4", 0, 1, 0.0001, step=.01),
+          sliderInput("ProbDeath2", "Death probability for critical infections 4 - 7", 0, 1, 0.0001, step=.01),
+          sliderInput("ProbDeath3", "Death probability for critical infections 8 - 12", 0, 1, 0.0001, step=.01),
+          sliderInput("ProbDeath4", "Death probability for critical infections 13 - 18", 0, 1, 0.0001, step=.01),
+          sliderInput("ProbDeath5", "Death probability for critical infections 19 - 25", 0, 1, 0.0415, step=.01),
+          sliderInput("ProbDeath6", "Death probability for critical infections 26 - 35", 0, 1, 0.0484, step=.01),
+          sliderInput("ProbDeath7", "Death probability for critical infections 36 - 50", 0, 1, 0.0619, step=.01),
+          sliderInput("ProbDeath8", "Death probability for critical infections 51 - 65", 0, 1, 0.2085, step=.01),
+          sliderInput("ProbDeath9", "Death probability for critical infections 66 - 75", 0, 1, 0.2899, step=.01),
+          sliderInput("ProbDeath10", "Death probability for critical infections 76 - 85", 0, 1, 0.3566, step=.01),
+          sliderInput("ProbDeath11", "Death probability for critical infections > 85", 0, 1, 0.9084, step=.01)
+        ), # source: https://www.cdc.gov/mmwr/volumes/69/wr/pdfs/mm6912e2-H.pdf
         tabPanel(
           "Contact Rate Per Age Group",
           h4(div(HTML("<em>Change default values of daily contacts between age groups...</em>"))),
@@ -297,9 +297,7 @@ fluidPage(
           "Sources",
           fluidPage(
             br(),
-            h4("TODO: This page will contain all sources used for choosing the default parameters once I have collected them."),
-            h4("If you have any sources on infection severity for COVID19 by age group or probability of infection given close contact please send them to me using the email in the About section")
-            #uiOutput("parameterDesc")
+            includeMarkdown("Sources.Rmd")
           )
         ),
          
